@@ -1,0 +1,13 @@
+# Scratch and temporary testing files
+scratch/
+scratch_*.png
+*.tmp
+
+# OS specific files
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log

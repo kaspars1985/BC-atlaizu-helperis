@@ -1,0 +1,49 @@
+========================================================================
+BC MENEDŽERA PALĪGS (AM Furnitūra) - UZSTĀDĪŠANAS PAMĀCĪBA
+========================================================================
+
+Šis paplašinājums paredzēts darbam ar Microsoft Dynamics 365 Business Central
+(https://amfbc.amf.lv:8443).
+
+Tas automātiski atpazīst pasūtījumā norādīto "Saistītā klienta nr.",
+atrod viņa personīgās rindu atlaides un ar vienu klikšķi ieraksta tās
+pasūtījuma rindās.
+
+------------------------------------------------------------------------
+UZSTĀDĪŠANA MICROSOFT EDGE PĀRLŪKĀ (Aizņem 30 sekundes):
+------------------------------------------------------------------------
+1. Atveriet Microsoft Edge.
+2. Adreses joslā augšā ierakstiet:
+   edge://extensions
+   un nospiediet Enter.
+
+3. Kreisajā sānjoslā IESLĒDZIET slēdzi "Developer mode" (Izstrādātāja režīms).
+
+4. Lapas augšpusē parādīsies poga "Load unpacked" (Ielādēt neiepakotu).
+   Uzklikšķiniet uz tās.
+
+5. Izvēlieties šo mapi:
+   C:\Users\KasparsCiematnieks\Desktop\ANTIGRAVITY\BC menedžera palīgs
+
+6. Edge rīkjoslā (pie puzles ikonas) uzklikšķiniet uz acs ikonas pie 
+   "BC menedžera palīgs", lai tā vienmēr būtu redzama.
+
+------------------------------------------------------------------------
+KĀ LIETOT IKDIENĀ:
+------------------------------------------------------------------------
+1. Atveriet jebkuru pasūtījumu Business Central (PPAS...).
+2. Ja pasūtījumā ir ievadīts "Saistītā klienta nr.", ekrāna apakšā pa labi
+   parādīsies oranža poga: "⚡ Piemērot atlaides".
+3. Uzklikšķiniet uz tās - atvērsies priekšskatījuma logs.
+4. Nospiediet "⚡ Ierakstīt atlaides pasūtījumā", un sistēma pati aizpildīs
+   "Rindas atlaide %" laukus visām precēm!
+
+------------------------------------------------------------------------
+KĀ VIENREIZ IELASĪT KLIENTA ATLAIDES:
+------------------------------------------------------------------------
+1. Atveriet Business Central atlaižu lapu:
+   https://amfbc.amf.lv:8443/AMF/?page=7004
+2. Atlasiet vajadzīgo klientu laukā "Pārdošanas kods".
+3. Lapas augšpusē nospiediet "💾 Saglabāt atlaides BC palīgam".
+4. Gatavs! Šī klienta atlaides turpmāk saglabāsies un darbosies automātiski.
+========================================================================

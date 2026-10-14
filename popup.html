@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8">
+  <title>BC Menedžera Palīgs</title>
+  <style>
+    :root {
+      --primary: #ff5501;
+      --primary-hover: #e04b00;
+      --dark: #1e293b;
+      --gray-bg: #f8fafc;
+      --border: #e2e8f0;
+      --text: #334155;
+      --text-muted: #64748b;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: #ffffff;
+      font-size: 13px;
+    }
+
+    .header {
+      padding: 14px 16px;
+      background: var(--dark);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-title-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-badge {
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .header-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .header-version {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 14px 16px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .card {
+      background: var(--gray-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+
+    .client-list {
+      list-style: none;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .client-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #edf2f7;
+      font-size: 12.5px;
+    }
+
+    .client-item:last-child {
+      border-bottom: none;
+    }
+
+    .client-code {
+      font-weight: 600;
+      color: var(--dark);
+    }
+
+    .client-count {
+      color: var(--text-muted);
+      font-size: 11.5px;
+    }
+
+    .empty-text {
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 10px 0;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+      margin-bottom: 8px;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #f1f5f9;
+    }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: #b91c1c;
+      border-color: #fca5a5;
+    }
+
+    .btn-danger:hover {
+      background: #fecaca;
+    }
+
+    .footer {
+      padding: 10px 16px;
+      background: var(--gray-bg);
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-title-box">
+      <div class="logo-badge">⚡</div>
+      <div>
+        <div class="header-title">BC Menedžera Palīgs</div>
+        <div class="header-version" id="header-version-text">AM Furnitūra · v1.3.6</div>
+      </div>
+    </div>
+    <div class="status-badge">Aktīvs</div>
+  </div>
+
+  <div class="content">
+    <div class="section-title">Saglabātie klienti un atlaides</div>
+    <div class="card">
+      <ul class="client-list" id="client-list">
+        <li class="empty-text">Ielādē datus...</li>
+      </ul>
+    </div>
+
+    <div class="section-title">Pasūtījuma darbības</div>
+    <button class="btn btn-primary" id="open-modal-in-page-btn" style="padding: 10px 14px; font-size: 13px; margin-bottom: 14px;">
+      <span>⚡</span> Atvērt atlaižu pārvaldnieku pasūtījumā
+    </button>
+
+    <div class="section-title">Ātrās darbības</div>
+    <button class="btn btn-secondary" id="open-page7004-btn">
+      <span>🔍</span> Atvērt Page 7004 (Sales Line Discounts)
+    </button>
+    <button class="btn btn-danger" id="clear-cache-btn">
+      <span>🗑️</span> Notīrīt atlaižu kešatmiņu
+    </button>
+  </div>
+
+  <div class="footer">
+    Atveriet pasūtījumu (Page 42) un spiediet oranžo pogu apakšā pa labi.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

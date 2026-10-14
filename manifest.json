@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "BC menedžera palīgs",
+  "version": "1.3.6",
+  "description": "Vieds palīgs AM Furnitūra menedžeriem: saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Business Central.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "*://amfbc.amf.lv/*",
+    "*://*.amf.lv/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://amfbc.amf.lv/*",
+        "*://*.amf.lv/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*"
+      ],
+      "matches": [
+        "*://amfbc.amf.lv/*",
+        "*://*.amf.lv/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BC menedžera palīgs",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

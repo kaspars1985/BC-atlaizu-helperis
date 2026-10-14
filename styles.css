@@ -1,0 +1,624 @@
+/* ==========================================================================
+   BC Menedžera Palīgs - Stili (Styles)
+   Pielāgots Microsoft Dynamics 365 Business Central un AM Furnitūra dizainam
+   ========================================================================== */
+
+:root {
+  --bcm-primary: #ff5501;         /* AM Furnitūra Oranžs */
+  --bcm-primary-hover: #e04b00;
+  --bcm-primary-light: #fff3ec;
+  --bcm-dark: #1b1f24;
+  --bcm-gray-bg: #f8f9fa;
+  --bcm-border: #e1e4e8;
+  --bcm-text: #24292e;
+  --bcm-text-muted: #586069;
+  --bcm-success: #28a745;
+  --bcm-success-bg: #e6ffed;
+  --bcm-warning: #f1a30c;
+  --bcm-warning-bg: #fff8e5;
+  --bcm-info: #0366d6;
+  --bcm-info-bg: #f1f8ff;
+  --bcm-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --bcm-radius: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   1. Peldošā poga pasūtījuma logā (Floating Launcher Button)
+   -------------------------------------------------------------------------- */
+.bcm-launcher-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #ff5501 0%, #e04b00 100%);
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 50px;
+  box-shadow: 0 4px 16px rgba(255, 85, 1, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.bcm-launcher-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 85, 1, 0.45), 0 3px 8px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, #ff6614 0%, #eb4f00 100%);
+}
+
+.bcm-launcher-btn:active {
+  transform: translateY(0);
+}
+
+.bcm-launcher-icon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bcm-launcher-client-badge {
+  background: rgba(0, 0, 0, 0.22);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --------------------------------------------------------------------------
+   2. Modālais priekšskatījuma logs (Modal Preview Dialog)
+   -------------------------------------------------------------------------- */
+.bcm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: bcmFadeIn 0.2s ease-out;
+}
+
+@keyframes bcmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bcm-modal-card {
+  width: 100%;
+  max-width: 960px;
+  max-height: 88vh;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: var(--bcm-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--bcm-text);
+  border: 1px solid var(--bcm-border);
+  animation: bcmScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bcmScaleUp {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Modālā loga galvene */
+.bcm-modal-header {
+  padding: 16px 22px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--bcm-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bcm-modal-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bcm-logo-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--bcm-primary-light);
+  color: var(--bcm-primary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.bcm-modal-title {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--bcm-dark);
+  margin: 0;
+}
+
+.bcm-modal-subtitle {
+  font-size: 12px;
+  color: var(--bcm-text-muted);
+  margin-top: 2px;
+}
+
+.bcm-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--bcm-text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.bcm-close-btn:hover {
+  background: #f1f3f5;
+  color: var(--bcm-dark);
+}
+
+/* Klienta informācijas kaste */
+.bcm-client-banner {
+  padding: 12px 22px;
+  background: #fcfcfc;
+  border-bottom: 1px solid var(--bcm-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bcm-client-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bcm-meta-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  background: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.bcm-meta-label {
+  color: var(--bcm-text-muted);
+  font-weight: 500;
+}
+
+.bcm-meta-val {
+  color: var(--bcm-dark);
+  font-weight: 600;
+}
+
+.bcm-meta-val.highlight {
+  color: var(--bcm-primary);
+}
+
+/* Kopsavilkuma rādītāji (Chips) */
+.bcm-summary-bar {
+  padding: 10px 22px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--bcm-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bcm-chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bcm-chip.total { background: #e2e8f0; color: #334155; }
+.bcm-chip.matched { background: var(--bcm-success-bg); color: var(--bcm-success); }
+.bcm-chip.overwritten { background: var(--bcm-warning-bg); color: #b45309; }
+.bcm-chip.nodisc { background: #f1f5f9; color: #64748b; }
+
+/* Rindu tabulas zona */
+.bcm-table-container {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0;
+  max-height: 52vh;
+}
+
+.bcm-lines-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.bcm-lines-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  padding: 9px 12px;
+  font-weight: 600;
+  color: var(--bcm-text-muted);
+  border-bottom: 2px solid var(--bcm-border);
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.bcm-lines-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: middle;
+}
+
+.bcm-lines-table tr:hover {
+  background-color: #f8fafc;
+}
+
+.bcm-row-num {
+  color: var(--bcm-text-muted);
+  font-weight: 500;
+  font-size: 11.5px;
+  width: 32px;
+}
+
+.bcm-item-code {
+  font-weight: 600;
+  color: var(--bcm-dark);
+  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.bcm-item-desc {
+  color: #4b5563;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Atlaižu ievades lauki tabulā */
+.bcm-discount-input {
+  width: 58px;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  color: var(--bcm-dark);
+  transition: all 0.15s;
+}
+
+.bcm-discount-input:focus {
+  outline: none;
+  border-color: var(--bcm-primary);
+  box-shadow: 0 0 0 3px rgba(255, 85, 1, 0.15);
+}
+
+.bcm-discount-input.highlight-new {
+  border-color: var(--bcm-success);
+  background-color: var(--bcm-success-bg);
+  color: #166534;
+}
+
+.bcm-discount-input.highlight-warn {
+  border-color: var(--bcm-warning);
+  background-color: var(--bcm-warning-bg);
+  color: #92400e;
+}
+
+.bcm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bcm-badge.item-match {
+  background: var(--bcm-success-bg);
+  color: #166534;
+}
+
+.bcm-badge.group-match {
+  background: var(--bcm-info-bg);
+  color: #1e40af;
+}
+
+.bcm-badge.all-match {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.bcm-badge.warn-overwrite {
+  background: var(--bcm-warning-bg);
+  color: #92400e;
+}
+
+.bcm-badge.no-match {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Modālā loga apakšdaļa (Footer) */
+.bcm-modal-footer {
+  padding: 14px 22px;
+  background: #ffffff;
+  border-top: 1px solid var(--bcm-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bcm-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Pogas */
+.bcm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  border: 1px solid transparent;
+  text-decoration: none;
+}
+
+.bcm-btn-primary {
+  background: var(--bcm-primary);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(255, 85, 1, 0.25);
+}
+
+.bcm-btn-primary:hover:not(:disabled) {
+  background: var(--bcm-primary-hover);
+  box-shadow: 0 4px 10px rgba(255, 85, 1, 0.35);
+}
+
+.bcm-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.bcm-btn-secondary {
+  background: #ffffff;
+  color: var(--bcm-text);
+  border-color: #d1d5db;
+}
+
+.bcm-btn-secondary:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+/* Progresa josla */
+.bcm-progress-box {
+  width: 100%;
+  padding: 12px 22px;
+  background: #fafafa;
+  border-top: 1px solid var(--bcm-border);
+  display: none;
+}
+
+.bcm-progress-box.active {
+  display: block;
+}
+
+.bcm-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bcm-text);
+  margin-bottom: 6px;
+}
+
+.bcm-progress-track {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bcm-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5501 0%, #10b981 100%);
+  width: 0%;
+  transition: width 0.15s ease;
+}
+
+/* Paziņojumu lodziņi (Toast messages) */
+.bcm-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 28px;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000002;
+  animation: bcmToastSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border-left: 4px solid var(--bcm-primary);
+}
+
+@keyframes bcmToastSlide {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.bcm-toast.success { border-left-color: var(--bcm-success); }
+.bcm-toast.warning { border-left-color: var(--bcm-warning); }
+.bcm-toast.error { border-left-color: #ef4444; }
+
+/* --------------------------------------------------------------------------
+   3. Paziņojumu josla Page 7004 logā (Top Banner on Page 7004)
+   -------------------------------------------------------------------------- */
+.bcm-page7004-banner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999998;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.bcm-page7004-banner.warning {
+  background: #7c2d12;
+  border-bottom: 2px solid #ea580c;
+}
+
+.bcm-page7004-banner.work {
+  background: #0f172a;
+  border-bottom: 2px solid #ff5501;
+}
+
+.bcm-page7004-banner.info {
+  background: #1e293b;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.bcm-page7004-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bcm-page7004-btn {
+  background: var(--bcm-primary);
+  color: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bcm-page7004-btn:hover {
+  background: var(--bcm-primary-hover);
+}
+
+/* --------------------------------------------------------------------------
+   4. Iezīmētā pasūtījuma šūna (Target Cell Highlight for Ctrl+V)
+   -------------------------------------------------------------------------- */
+.bcm-highlight-cell {
+  outline: 4px solid #ff5501 !important;
+  outline-offset: -2px !important;
+  background-color: rgba(255, 85, 1, 0.35) !important;
+  box-shadow: 0 0 22px rgba(255, 85, 1, 0.95) !important;
+  animation: bcm-pulse-highlight 1.2s infinite alternate !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  z-index: 100 !important;
+}
+
+.bcm-highlight-cell * {
+  background-color: transparent !important;
+}
+
+@keyframes bcm-pulse-highlight {
+  0% {
+    outline-color: #ff5501;
+    background-color: rgba(255, 85, 1, 0.25);
+    box-shadow: 0 0 10px rgba(255, 85, 1, 0.6);
+  }
+  100% {
+    outline-color: #ff8844;
+    background-color: rgba(255, 85, 1, 0.55);
+    box-shadow: 0 0 28px rgba(255, 85, 1, 1);
+  }
+}
+
+.bcm-paste-badge {
+  position: fixed !important;
+  background: #ff5501 !important;
+  color: #ffffff !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 85, 1, 0.8) !important;
+  z-index: 1000000 !important;
+  pointer-events: none !important;
+  transform: translate(-50%, -100%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  animation: bcmBadgeBounce 1s infinite alternate ease-in-out !important;
+  white-space: nowrap !important;
+}
+
+.bcm-paste-badge::after {
+  content: "" !important;
+  position: absolute !important;
+  bottom: -6px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-width: 6px 6px 0 !important;
+  border-style: solid !important;
+  border-color: #ff5501 transparent transparent transparent !important;
+}
+
+@keyframes bcmBadgeBounce {
+  0% { transform: translate(-50%, -100%) translateY(0); }
+  100% { transform: translate(-50%, -100%) translateY(-6px); }
+}
+
