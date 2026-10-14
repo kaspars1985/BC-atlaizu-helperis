@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "*://amfbc.amf.lv/*",
-    "*://*.amf.lv/*"
+    "*://*.amf.lv/*",
+    "https://api.github.com/*"
   ],
   "background": {
     "service_worker": "background.js"

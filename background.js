@@ -159,4 +159,102 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
+
+  // Versijas pārbaude (gan manuāla, gan automātiska)
+  if (request.action === "CHECK_FOR_UPDATES") {
+    checkVersionUpdate(!!request.force).then(info => {
+      sendResponse({ success: true, updateInfo: info });
+    }).catch(err => {
+      sendResponse({ success: false, error: err.message });
+    });
+    return true;
+  }
 });
+
+// --------------------------------------------------------------------------
+// Versijas pārbaudes dzinējs (GitHub Releases API)
+// --------------------------------------------------------------------------
+const GITHUB_REPO_API = "https://api.github.com/repos/kaspars1985/BC-atlaizu-helperis/releases/latest";
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 stundas
+
+function parseSemVer(v) {
+  if (!v) return [0, 0, 0];
+  const clean = String(v).replace(/^v/i, "").trim();
+  return clean.split(".").map(n => parseInt(n, 10) || 0);
+}
+
+function isNewerVersion(latest, current) {
+  const l = parseSemVer(latest);
+  const c = parseSemVer(current);
+  for (let i = 0; i < 3; i++) {
+    const lPart = l[i] || 0;
+    const cPart = c[i] || 0;
+    if (lPart > cPart) return true;
+    if (lPart < cPart) return false;
+  }
+  return false;
+}
+
+async function checkVersionUpdate(force = false) {
+  try {
+    const currentVersion = chrome.runtime.getManifest().version;
+    const stored = await chrome.storage.local.get(["bcm_update_info"]);
+    const now = Date.now();
+
+    if (!force && stored.bcm_update_info && (now - (stored.bcm_update_info.lastChecked || 0) < UPDATE_CHECK_INTERVAL_MS)) {
+      if (stored.bcm_update_info.hasUpdate) {
+        chrome.action.setBadgeText({ text: "NEW" });
+        chrome.action.setBadgeBackgroundColor({ color: "#ff5501" });
+      }
+      return stored.bcm_update_info;
+    }
+
+    const response = await fetch(GITHUB_REPO_API, {
+      headers: {
+        "Accept": "application/vnd.github.v3+json"
+      }
+    });
+
+    if (!response.ok) {
+      return stored.bcm_update_info || { currentVersion, hasUpdate: false, lastChecked: now };
+    }
+
+    const data = await response.json();
+    const latestTag = data.tag_name || "";
+    const hasUpdate = isNewerVersion(latestTag, currentVersion);
+    const asset = Array.isArray(data.assets) ? data.assets.find(a => a.name.endsWith(".zip")) : null;
+
+    const updateInfo = {
+      hasUpdate,
+      latestVersion: latestTag.replace(/^v/i, ""),
+      latestTag: latestTag,
+      currentVersion,
+      releaseName: data.name || latestTag,
+      releaseUrl: data.html_url || "https://github.com/kaspars1985/BC-atlaizu-helperis/releases",
+      downloadUrl: asset ? asset.browser_download_url : "https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest",
+      body: data.body || "",
+      lastChecked: now
+    };
+
+    await chrome.storage.local.set({ bcm_update_info: updateInfo });
+
+    if (hasUpdate) {
+      chrome.action.setBadgeText({ text: "NEW" });
+      chrome.action.setBadgeBackgroundColor({ color: "#ff5501" });
+    } else {
+      chrome.action.setBadgeText({ text: "" });
+    }
+
+    return updateInfo;
+  } catch (e) {
+    console.warn("[BC Atlaižu Helperis] Neizdevās pārbaudīt versiju:", e);
+    const stored = await chrome.storage.local.get(["bcm_update_info"]);
+    return stored.bcm_update_info || { currentVersion: chrome.runtime.getManifest().version, hasUpdate: false, error: e.message };
+  }
+}
+
+// Automātiskā pārbaude pie pārlūka palaišanas
+chrome.runtime.onStartup.addListener(() => {
+  checkVersionUpdate(false);
+});
+

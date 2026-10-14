@@ -200,6 +200,15 @@
     <div class="status-badge">Aktīvs</div>
   </div>
 
+  <div id="update-banner" style="display: none; margin: 12px 16px 0 16px; padding: 10px 12px; background: #fff8f1; border: 1px solid #fed7aa; border-radius: 8px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+      <div style="font-size: 12px; color: #9a3412;">
+        <strong>🚀 Pieejams jauns laidiens:</strong> <span id="update-version-tag"></span>
+      </div>
+      <a href="#" id="update-download-btn" target="_blank" style="display: inline-block; font-size: 11px; font-weight: 600; background: #ff5501; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none;">Atvērt</a>
+    </div>
+  </div>
+
   <div class="content">
     <div class="section-title">Saglabātie klienti un atlaides</div>
     <div class="card">
@@ -220,6 +229,20 @@
     <button class="btn btn-danger" id="clear-cache-btn">
       <span>🗑️</span> Notīrīt atlaižu kešatmiņu
     </button>
+
+    <div class="section-title" style="margin-top: 14px;">Atjauninājumi & Versija</div>
+    <div class="card" style="padding: 10px 12px; margin-bottom: 10px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+        <div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--dark);" id="version-current-label">Versija: v1.3.6</div>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;" id="version-last-checked-label">Pēdējā pārbaude: —</div>
+        </div>
+        <button class="btn btn-secondary" id="check-updates-btn" style="width: auto; padding: 5px 10px; font-size: 11px; margin: 0; white-space: nowrap;">
+          🔄 Pārbaudīt tagad
+        </button>
+      </div>
+      <div id="version-check-status" style="margin-top: 8px; font-size: 11px; display: none;"></div>
+    </div>
   </div>
 
   <div class="footer">

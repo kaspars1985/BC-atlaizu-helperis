@@ -1323,6 +1323,11 @@
       // Pārbaudām kešatmiņu
       const { rules: clientRules, isSynced } = await getClientRulesData(headerInfo.relatedCustomerNo);
       let lines = await matchDiscountsForLines(rawLines, headerInfo.relatedCustomerNo);
+      let updateInfo = null;
+      try {
+        const stored = await chrome.storage.local.get(["bcm_update_info"]);
+        updateInfo = stored.bcm_update_info;
+      } catch (e) {}
 
       const renderTableRows = (currentLines) => {
         if (!currentLines || currentLines.length === 0) {
@@ -1383,7 +1388,10 @@
             <div class="bcm-modal-title-box">
               <div class="bcm-logo-icon">⚡</div>
               <div>
-                <h3 class="bcm-modal-title">BC Atlaižu Helperis · Atlaižu Pārvaldnieks</h3>
+                <h3 class="bcm-modal-title" style="display: flex; align-items: center; gap: 8px;">
+                  <span>BC Atlaižu Helperis · Atlaižu Pārvaldnieks</span>
+                  ${updateInfo && updateInfo.hasUpdate ? `<a href="${updateInfo.releaseUrl}" target="_blank" style="text-decoration: none; font-size: 11px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 2px 7px; border-radius: 12px; font-weight: 600;">🚀 Pieejama v${escapeHtml(updateInfo.latestVersion)}</a>` : ""}
+                </h3>
                 <div class="bcm-modal-subtitle">Pasūtījums: ${headerInfo.orderNo || "Pārdošanas pasūtījums"} · AM Furnitūra</div>
               </div>
             </div>
