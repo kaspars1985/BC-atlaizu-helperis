@@ -1,5 +1,5 @@
 /**
- * BC Menedžera Palīgs - Popup Script
+ * BC Atlaižu Helperis - Popup Script
  */
 
 document.addEventListener("DOMContentLoaded", () => {

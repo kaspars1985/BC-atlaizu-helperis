@@ -1,5 +1,5 @@
 /**
- * BC Menedžera Palīgs - Content Script
+ * BC Atlaižu Helperis - Content Script
  * Manifest V3 - Integrācija ar Microsoft Dynamics 365 Business Central
  */
 
@@ -7,7 +7,7 @@
   if (window.__bcmManagerLoaded) return;
   window.__bcmManagerLoaded = true;
 
-  console.log("[BC Menedžera Palīgs] Sākotnējā ielāde Business Central lapā.");
+  console.log("[BC Atlaižu Helperis] Sākotnējā ielāde Business Central lapā.");
 
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
@@ -75,7 +75,7 @@
       isTop: window === window.top,
       ...data
     };
-    console.log(`[BC Menedžera Palīgs v${APP_VERSION}] [${step}]`, data);
+    console.log(`[BC Atlaižu Helperis v${APP_VERSION}] [${step}]`, data);
     if (!isExtensionContextValid()) return;
     try {
       const res = await chrome.storage.local.get(["bcm_debug_log"]);
@@ -124,7 +124,7 @@
         if (window !== window.top) return;
 
         bcmLog("CUSTOMER_SYNC_COMPLETED_RECEIVED", { customerNo: request.customerNo, count: request.count });
-        console.log(`[BC Menedžera Palīgs] Sinhronizācija pabeigta klientam ${request.customerNo} (${request.count} noteikumi).`);
+        console.log(`[BC Atlaižu Helperis] Sinhronizācija pabeigta klientam ${request.customerNo} (${request.count} noteikumi).`);
         if (request.count > 0) {
           showToast(`✓ Klienta ${request.customerNo} atlaides (${request.count} noteikumi) veiksmīgi ielasītas!`, "success");
         } else {
@@ -371,7 +371,7 @@
       <span style="font-size: 10px; opacity: 0.8; margin-left: 2px;">v${APP_VERSION}</span>
       <span id="bcm-launcher-badge" class="bcm-launcher-client-badge">Meklē klientu...</span>
     `;
-    btn.title = `BC Menedžera Palīgs v${APP_VERSION}`;
+    btn.title = `BC Atlaižu Helperis v${APP_VERSION}`;
 
     btn.addEventListener("click", () => {
       if (!isExtensionContextValid()) {
@@ -601,7 +601,7 @@
       `;
       (doc.head || doc.body || doc.documentElement).appendChild(style);
     } catch (e) {
-      console.warn("[BC Menedžera Palīgs] Neizdevās ievietot stilus dokumentā:", e);
+      console.warn("[BC Atlaižu Helperis] Neizdevās ievietot stilus dokumentā:", e);
     }
   }
 
@@ -660,7 +660,7 @@
         }
       }
     } catch (e) {
-      console.warn("[BC Menedžera Palīgs] Galvenes saskaņošanas kļūda:", e);
+      console.warn("[BC Atlaižu Helperis] Galvenes saskaņošanas kļūda:", e);
     }
 
     bcmLog("CELL_NOT_FOUND", { cells: rowCells.length });
@@ -725,13 +725,13 @@
     }
 
     if (!listPart) {
-      console.warn("[BC Menedžera Palīgs] Neizdevās atrast pasūtījuma rindu tabulu (.ms-nav-listpartform).");
+      console.warn("[BC Atlaižu Helperis] Neizdevās atrast pasūtījuma rindu tabulu (.ms-nav-listpartform).");
       return lines;
     }
 
     const allRows = Array.from(listPart.querySelectorAll('[role="row"], tr'));
     if (allRows.length === 0) {
-      console.warn("[BC Menedžera Palīgs] Rindu konteinerā nav atrasta neviena rinda.");
+      console.warn("[BC Atlaižu Helperis] Rindu konteinerā nav atrasta neviena rinda.");
       return lines;
     }
 
@@ -814,7 +814,7 @@
     if (colIndices.desc === -1) colIndices.desc = 20;
     if (colIndices.discount === -1) colIndices.discount = 28;
 
-    console.log("[BC Menedžera Palīgs] Kolonnu indeksi:", colIndices, "Aria-indices:", colAriaIndices);
+    console.log("[BC Atlaižu Helperis] Kolonnu indeksi:", colIndices, "Aria-indices:", colAriaIndices);
 
     // 2. Apstrādājam datu rindas
     const dataRows = allRows.filter(r => r !== headerRow);
@@ -1009,7 +1009,7 @@
       codeCounts[k] = l.ordinal + 1;
     });
 
-    console.log(`[BC Menedžera Palīgs] Veiksmīgi nolasītas ${lines.length} pasūtījuma rindas.`);
+    console.log(`[BC Atlaižu Helperis] Veiksmīgi nolasītas ${lines.length} pasūtījuma rindas.`);
     lines.listPart = listPart;
     return lines;
   }
@@ -1085,7 +1085,7 @@
         }
       }
     } catch (e) {
-      console.warn("[BC Menedžera Palīgs] Kļūda extractAllSalesLines:", e);
+      console.warn("[BC Atlaižu Helperis] Kļūda extractAllSalesLines:", e);
     } finally {
       try { scroller.scrollTop = origTop; } catch (e) {}
       bcmBusy = false;
@@ -1383,7 +1383,7 @@
             <div class="bcm-modal-title-box">
               <div class="bcm-logo-icon">⚡</div>
               <div>
-                <h3 class="bcm-modal-title">BC Menedžera Palīgs · Atlaižu Pārvaldnieks</h3>
+                <h3 class="bcm-modal-title">BC Atlaižu Helperis · Atlaižu Pārvaldnieks</h3>
                 <div class="bcm-modal-subtitle">Pasūtījums: ${headerInfo.orderNo || "Pārdošanas pasūtījums"} · AM Furnitūra</div>
               </div>
             </div>
@@ -1659,7 +1659,7 @@
       }, 400);
 
     } catch (err) {
-      console.error("[BC Menedžera Palīgs] Kļūda atverot modālo logu:", err);
+      console.error("[BC Atlaižu Helperis] Kļūda atverot modālo logu:", err);
       if (err.message && err.message.includes("Extension context invalidated")) {
         showToast("Paplašinājums tika atjaunināts! Lūdzu, pārlādējiet šo lapu (F5).", "warning");
       } else {
@@ -1689,7 +1689,7 @@
         el.dispatchEvent(new Event("change", { bubbles: true }));
       });
     } catch (e) {
-      console.warn("[BC Menedžera Palīgs] Kļūda resetGridSelection:", e);
+      console.warn("[BC Atlaižu Helperis] Kļūda resetGridSelection:", e);
     }
   }
 
@@ -2179,10 +2179,10 @@
     banner.innerHTML = `
       <div class="bcm-page7004-info">
         <span style="font-size: 16px;">⚡</span>
-        <span id="bcm-page7004-status-text"><strong>BC Menedžera Palīgs (v${APP_VERSION}):</strong> Gatavs nolasīt un saglabāt klienta rindu atlaides kešā.</span>
+        <span id="bcm-page7004-status-text"><strong>BC Atlaižu Helperis (v${APP_VERSION}):</strong> Gatavs nolasīt un saglabāt klienta rindu atlaides kešā.</span>
       </div>
       <div id="bcm-page7004-actions" style="display: flex; align-items: center; gap: 8px;">
-        <button class="bcm-page7004-btn" id="bcm-scrape-7004-btn">💾 Saglabāt atlaides BC palīgam</button>
+        <button class="bcm-page7004-btn" id="bcm-scrape-7004-btn">💾 Saglabāt atlaides helperim</button>
       </div>
     `;
 
@@ -2223,7 +2223,7 @@
 
     if (!session || !session.isSyncTab) {
       bcmLog("PAGE7004_OPENED_MANUALLY");
-      setBanner("info", `<strong>BC Menedžera Palīgs (v${APP_VERSION}):</strong> Lapa atvērta manuāli. Nofiltrējiet klientu un spiediet <em>'💾 Saglabāt atlaides BC palīgam'</em>.`);
+      setBanner("info", `<strong>BC Atlaižu Helperis (v${APP_VERSION}):</strong> Lapa atvērta manuāli. Nofiltrējiet klientu un spiediet <em>'💾 Saglabāt atlaides helperim'</em>.`);
       return; // K5: NEKAD neautomatizē un neaizver cilni, ko lietotājs atvēra pats
     }
 
@@ -2394,7 +2394,7 @@
 
   function failKeepOpen(msg) {
     bcmLog("SYNC_FAILED_KEEP_OPEN", { message: msg });
-    setBanner("warning", `⚠️ <strong>BC Menedžera Palīgs:</strong> ${escapeHtml(msg)}`, true);
+    setBanner("warning", `⚠️ <strong>BC Atlaižu Helperis:</strong> ${escapeHtml(msg)}`, true);
     showToast(`⚠️ ${msg}`, "warning");
 
     const actionsBox = document.getElementById("bcm-page7004-actions");
@@ -2501,8 +2501,8 @@
       if (autoCloseCancelled) return;
       if (statusEl) {
         statusEl.innerHTML = count > 0
-          ? `✅ <strong>BC Menedžera Palīgs:</strong> Saglabātas <strong>${count}</strong> atlaides klientam <strong>${customerNo}</strong>! Cilne aizvērsies pēc <strong>${remaining}s</strong>...`
-          : `ℹ️ <strong>BC Menedžera Palīgs:</strong> Klientam <strong>${customerNo}</strong> Business Central nav individuālu atlaižu (0%). Saglabāts. Cilne aizvērsies pēc <strong>${remaining}s</strong>...`;
+          ? `✅ <strong>BC Atlaižu Helperis:</strong> Saglabātas <strong>${count}</strong> atlaides klientam <strong>${customerNo}</strong>! Cilne aizvērsies pēc <strong>${remaining}s</strong>...`
+          : `ℹ️ <strong>BC Atlaižu Helperis:</strong> Klientam <strong>${customerNo}</strong> Business Central nav individuālu atlaižu (0%). Saglabāts. Cilne aizvērsies pēc <strong>${remaining}s</strong>...`;
       }
 
       if (actionsEl && !document.getElementById("bcm-cancel-close-btn")) {
@@ -2515,7 +2515,7 @@
           autoCloseCancelled = true;
           clearTimeout(autoCloseTimer);
           if (statusEl) {
-            statusEl.innerHTML = `✓ <strong>BC Menedžera Palīgs:</strong> Dati saglabāti kešā. Cilne paliek atvērta pārskatīšanai.`;
+            statusEl.innerHTML = `✓ <strong>BC Atlaižu Helperis:</strong> Dati saglabāti kešā. Cilne paliek atvērta pārskatīšanai.`;
           }
           if (actionsEl) {
             actionsEl.innerHTML = `<button class="bcm-page7004-btn" id="bcm-close-now-btn">Aizvērt cilni</button>`;

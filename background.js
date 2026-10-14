@@ -1,11 +1,11 @@
 /**
- * BC Menedžera Palīgs - Background Service Worker
+ * BC Atlaižu Helperis - Background Service Worker
  * Manifest V3
  */
 
 // Initialize default storage on installation
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[BC Menedžera Palīgs] Paplašinājums veiksmīgi uzstādīts!");
+  console.log("[BC Atlaižu Helperis] Paplašinājums veiksmīgi uzstādīts!");
   
   chrome.storage.local.get(["bc_manager_settings", "bc_client_discounts"], (data) => {
     if (!data.bc_manager_settings) {
@@ -67,7 +67,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         });
       } catch (e) {
-        console.warn("[BC Menedžera Palīgs] Neizdevās saglabāt storage.session:", e);
+        console.warn("[BC Atlaižu Helperis] Neizdevās saglabāt storage.session:", e);
       }
       sendResponse({ success: true, syncTabId: newTab.id });
     });
