@@ -12,7 +12,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "1.3.7";
+  const APP_VERSION = "1.3.8";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -463,7 +463,7 @@
           (combinedDesc.includes("klienta nr") || combinedDesc.includes("sell-to customer no") || combinedDesc.includes("customer no")) &&
           !combinedDesc.includes("saistīt") && !combinedDesc.includes("preces")
         ) {
-          if (!info.customerNo) info.customerNo = val;
+          if (!info.customerNo && !/klienta|customer|nr\.?$/i.test(val) && val.length <= 25 && !isInsideFactBox(el)) info.customerNo = val;
         }
         // Dokumenta datums
         else if (combinedDesc.includes("dokumenta datums") || combinedDesc.includes("document date")) {
@@ -605,12 +605,130 @@
     }
   }
 
+  // Normalizē galvenes tekstu: noņem mīkstos defises, savāc atstarpes, mazie burti.
+  function normHeaderCaption(el) {
+    if (!el) return "";
+    const raw = (el.innerText || el.textContent || el.getAttribute("title") || el.getAttribute("aria-label") || "");
+    return String(raw)
+      .replace(/\u00AD/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  // Vai elements atrodas FactBox / papildu informācijas panelī
+  function isInsideFactBox(el) {
+    if (!el || !el.closest) return false;
+    if (el.closest('.ms-nav-factboxArea, .factbox-area, [class*="factbox"], [class*="FactBox"], [class*="Factbox"], aside, [role="complementary"]')) return true;
+    let p = el;
+    while (p && p !== p.ownerDocument?.body) {
+      const cls = ((p.className && typeof p.className === "string" ? p.className : "") + " " + (p.getAttribute?.("aria-label") || "")).toLowerCase();
+      if (cls.includes("factbox") || cls.includes("pielikumi") || cls.includes("detalizēta informācija")) return true;
+      p = p.parentElement;
+    }
+    return false;
+  }
+
+  // Atrod pasūtījuma rindu saraksta daļu (listpart), izslēdzot FactBox.
+  function findSalesLinesListPart(bcDoc) {
+    const docs = [];
+    if (bcDoc) docs.push(bcDoc);
+    try {
+      const all = (typeof getAllBCDocuments === "function") ? getAllBCDocuments() : [];
+      for (const d of all) if (d && d !== bcDoc) docs.push(d);
+    } catch (e) { /* ignorējam */ }
+
+    const selector = '.ms-nav-listpartform, .ms-nav-collapsible-part, .hosting-list, div[class*="listpartform"]';
+    const candidates = [];
+    const seen = new Set();
+    for (const d of docs) {
+      let nodes = [];
+      try { nodes = Array.from(d.querySelectorAll(selector)); } catch (e) { nodes = []; }
+      for (const n of nodes) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        candidates.push(n);
+      }
+    }
+
+    // Filtrējam ārā FactBox un "faila paplašinājums" blokus
+    const filtered = candidates.filter(c => {
+      if (isInsideFactBox(c)) return false;
+      const headerText = normHeaderCaption(c);
+      if (headerText.includes("faila paplašinājums")) return false;
+      return true;
+    });
+
+    // Vērtējam kandidātus
+    let best = null;
+    let bestScore = 0;
+    for (const c of filtered) {
+      let score = 0;
+
+      // +50 par raksturīgiem controlname
+      if (c.querySelector('[controlname="No."], [controlname="Line Discount %"], [controlname="Quantity"], [controlname="ShortcutDimCode6"]')) {
+        score += 50;
+      }
+
+      // +35 par galvenes kolonnu tekstiem
+      try {
+        const headerCells = Array.from(c.querySelectorAll('th, [role="columnheader"]'));
+        const headerText = headerCells.map(h => normHeaderCaption(h)).join(" ");
+        const hasCode = /\bnr\.?\b|\bno\.?\b|artikuls/i.test(headerText);
+        const hasOther = /apraksts|description|daudzums|quantity|rind.*atlaid|line\s*disc|vienības\s*cena/i.test(headerText);
+        if (hasCode && hasOther) score += 35;
+      } catch (e) { /* ignorējam */ }
+
+      // +20 par 'rindas' / 'lines' tekstu vai tuvējo parakstu
+      try {
+        const ownText = normHeaderCaption(c);
+        let nearby = "";
+        const parent = c.parentElement;
+        if (parent) {
+          const cap = parent.querySelector('h1, h2, h3, h4, .ms-nav-caption, [class*="caption"]');
+          if (cap) nearby = normHeaderCaption(cap);
+        }
+        if (ownText.includes("rindas") || ownText.includes("lines") || nearby.includes("rindas") || nearby.includes("lines")) {
+          score += 20;
+        }
+      } catch (e) { /* ignorējam */ }
+
+      // +10 par tabulas/grid klātbūtni
+      if (c.querySelector('table.ms-nav-grid-data-table, [role="grid"]')) score += 10;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+
+    if (best && bestScore > 0) return best;
+
+    // Rezerves variants: meklējam grid/tabulu ārpus FactBox ar 'nr.' un 'apraksts'/'daudzums'
+    for (const d of docs) {
+      let grids = [];
+      try {
+        grids = Array.from(d.querySelectorAll('[role="grid"], table.ms-nav-grid-data-table, table'));
+      } catch (e) { grids = []; }
+      for (const g of grids) {
+        if (isInsideFactBox(g)) continue;
+        const txt = normHeaderCaption(g);
+        if (txt.includes("faila paplašinājums")) continue;
+        const hasNr = /\bnr\.?\b|\bno\.?\b|artikuls/i.test(txt);
+        const hasDesc = /apraksts|daudzums/i.test(txt);
+        if (hasNr && hasDesc) return g;
+      }
+    }
+
+    return null;
+  }
+
   // Atrod precīzo 'Rindas atlaides %' šūnu datu rindā. Nekad neminam — ja nav droši atrasts, atgriežam null.
   function findExactDiscountCell(rowElement, bcDoc) {
     if (!rowElement) return null;
     const rowCells = Array.from(rowElement.querySelectorAll('[role="gridcell"], td, th'));
     if (rowCells.length === 0) return null;
-    const discRe = /rind[a-z]*\s*atlaid|line\s*disc/i;
+    const discRe = /rind.*atlaid|atlaid.*%|line\s*disc/i;
 
     // 1. BC controlname tieši šūnai
     const byName = rowElement.querySelector('td[controlname="Line Discount %"], td[controlname="Line Discount Pct"], td[controlname="LineDiscountPct"], [controlname="Line Discount %"]');
@@ -629,18 +747,19 @@
 
     // 3. Galvene tajā pašā saraksta daļā
     try {
-      const listPart = rowElement.closest('.ms-nav-listpartform, .ms-nav-collapsible-part, .hosting-list, div[class*="listpartform"]') ||
-        (bcDoc && bcDoc.querySelector('.ms-nav-listpartform')) ||
-        (rowElement.ownerDocument && rowElement.ownerDocument.querySelector('.ms-nav-listpartform')) ||
-        document.querySelector('.ms-nav-listpartform');
+      const rowLp = rowElement.closest('.ms-nav-listpartform, .ms-nav-collapsible-part, .hosting-list, div[class*="listpartform"]');
+      const listPart = (rowLp && !isInsideFactBox(rowLp) ? rowLp : null) ||
+        findSalesLinesListPart(bcDoc) ||
+        (rowElement.ownerDocument && findSalesLinesListPart(rowElement.ownerDocument)) ||
+        findSalesLinesListPart(document);
 
       if (listPart) {
         const headers = Array.from(listPart.querySelectorAll('table.ms-nav-grid-header-table th, [role="columnheader"], th'))
           .filter(h => !rowElement.contains(h));
         const discHeader = headers.find(h => {
           const cName = (h.getAttribute("controlname") || "").toLowerCase();
-          const txt = (h.innerText || h.textContent || h.getAttribute("title") || h.getAttribute("aria-label") || "").trim().toLowerCase();
-          return cName.includes("discount") || discRe.test(txt);
+          const caption = normHeaderCaption(h);
+          return cName.includes("discount") || discRe.test(caption);
         });
         if (discHeader) {
           // 3a. Pēc aria-colindex / data-col-index
@@ -729,31 +848,11 @@
       }
     }
 
-    // Meklējam Rindu konteineru Business Central formā
-    let listPart = bcDoc.querySelector('.ms-nav-listpartform');
-    if (!listPart) {
-      const allParts = Array.from(bcDoc.querySelectorAll('.ms-nav-collapsible-part, .hosting-list, div[class*="listpartform"]'));
-      for (const part of allParts) {
-        if ((part.innerText || '').toLowerCase().includes('rindas') && part.querySelectorAll('[role="row"], tr').length > 1) {
-          listPart = part;
-          break;
-        }
-      }
-    }
+    // Meklējam Rindu konteineru Business Central formā (izslēdzot FactBox)
+    const listPart = findSalesLinesListPart(bcDoc);
 
     if (!listPart) {
-      const tables = Array.from(bcDoc.querySelectorAll('[role="grid"], [role="table"], table, .ms-nav-grid'));
-      for (const t of tables) {
-        const tText = (t.innerText || '').toLowerCase();
-        if (tText.includes('tips') && (tText.includes('nr.') || tText.includes('apraksts'))) {
-          listPart = t;
-          break;
-        }
-      }
-    }
-
-    if (!listPart) {
-      console.warn("[BC Atlaižu Helperis] Neizdevās atrast pasūtījuma rindu tabulu (.ms-nav-listpartform).");
+      console.warn("[BC Atlaižu Helperis] Neizdevās atrast pasūtījuma rindu tabulu.");
       return lines;
     }
 
@@ -793,7 +892,7 @@
       const headerCells = Array.from(r.querySelectorAll('[role="columnheader"], th, td, [role="gridcell"]'));
       const texts = headerCells.map(c => {
         const cName = (c.getAttribute("controlname") || "").toLowerCase().trim();
-        const t = (c.innerText || c.getAttribute('title') || '').trim().toLowerCase();
+        const t = normHeaderCaption(c);
         return `${cName} ${t}`;
       });
 
@@ -805,7 +904,7 @@
         headerCellsCount = headerCells.length;
         headerCells.forEach((h, idx) => {
           const cName = (h.getAttribute("controlname") || "").toLowerCase().trim();
-          const caption = (h.innerText || h.getAttribute("title") || h.getAttribute("aria-label") || "").trim().toLowerCase();
+          const caption = normHeaderCaption(h);
           const colIdx = h.getAttribute("aria-colindex") || h.getAttribute("data-col-index");
 
           if (cName === "type" || /^tips\b|^type\b/i.test(caption)) {
@@ -826,7 +925,7 @@
           } else if (/pasūtītais\s*daudzums/i.test(caption) && colIndices.qty === -1) {
             colIndices.qty = idx;
             if (colIdx) colAriaIndices.qty = colIdx;
-          } else if (cName.includes("discount") || /rind[a-z]*\s*atlaid|line\s*disc/i.test(caption)) {
+          } else if (cName.includes("discount") || /rind.*atlaid|atlaid.*%|line\s*disc/i.test(caption)) {
             colIndices.discount = idx;
             if (colIdx) colAriaIndices.discount = colIdx;
           } else if (cName.includes("unit price") || /vienības\s*cena|unit\s*price/i.test(caption)) {
@@ -850,8 +949,14 @@
 
     console.log("[BC Atlaižu Helperis] Kolonnu indeksi:", colIndices, "Aria-indices:", colAriaIndices);
 
-    // 2. Apstrādājam datu rindas
-    const dataRows = allRows.filter(r => r !== headerRow);
+    // 2. Apstrādājam datu rindas (izslēdzam galveni un galvenes šūnas)
+    const dataRows = allRows.filter(r => {
+      if (r === headerRow) return false;
+      if (r.closest('thead, table.ms-nav-grid-header-table')) return false;
+      const hasHeaderCell = r.querySelector('th, [role="columnheader"]');
+      if (hasHeaderCell && !r.querySelector('td[role="gridcell"]')) return false;
+      return true;
+    });
     let validRowCounter = 0;
 
     dataRows.forEach((row, rowIdx) => {
@@ -918,7 +1023,7 @@
       const noTd = row.querySelector('td[controlname="No."], td[controlname="No"], td[controlname="ItemNo"], td[controlname="Item No."], [controlname="No."]');
       if (noTd) {
         const val = getVal(noTd);
-        if (val && !isDateString(val) && !/^(on|off|tips|nr\.?|prece|item)$/i.test(val)) {
+        if (val && !isDateString(val) && !/^(on|off|tips|nr\.?|prece|item|nosaukums|name|faila|paplašinājums|kopā|total)$/i.test(val)) {
           codeVal = val;
         }
       }
@@ -928,7 +1033,7 @@
         const ariaCell = row.querySelector(`[aria-colindex="${colAriaIndices.code}"], [data-col-index="${colAriaIndices.code}"]`);
         if (ariaCell) {
           const val = getVal(ariaCell);
-          if (val && !isDateString(val) && !/^(on|off|tips|nr\.?|prece|item)$/i.test(val)) {
+          if (val && !isDateString(val) && !/^(on|off|tips|nr\.?|prece|item|nosaukums|name|faila|paplašinājums|kopā|total)$/i.test(val)) {
             codeVal = val;
           }
         }
@@ -939,7 +1044,7 @@
         const realIdx = colIndices.code + rowOffset;
         if (realIdx >= 0 && realIdx < cells.length) {
           const val = getCellVal(realIdx);
-          if (val && !isDateString(val) && !/^(on|off|tips|nr\.?|prece|item)$/i.test(val)) {
+          if (val && !isDateString(val) && !/^(on|off|tips|nr\.?|prece|item|nosaukums|name|faila|paplašinājums|kopā|total)$/i.test(val)) {
             codeVal = val;
           }
         }
@@ -952,7 +1057,7 @@
           const val = getCellVal(i);
           if (!val || val.length < 2 || val.length > 30) continue;
           if (isDateString(val)) continue;
-          if (/^(prece|item|resurss|konts|komentārs|pamatlīdzeklis|gab|komp|m|kg|rull|paka|pcs|set|on|off|nr\.?|tips)$/i.test(val)) continue;
+          if (/^(prece|item|resurss|konts|komentārs|pamatlīdzeklis|gab|komp|m|kg|rull|paka|pcs|set|on|off|nr\.?|tips|nosaukums|name|faila|paplašinājums|kopā|total)$/i.test(val)) continue;
           if (/^\d+([,\.]\d+)?\s*(%|eur)?$/i.test(val)) continue;
           if (/^[0-9A-Za-z]+[0-9A-Za-z\.\-_/]*$/.test(val)) {
             codeVal = val;
@@ -1124,7 +1229,6 @@
 
     return lines;
   }
-
   // Atrod vertikāli ritināmo konteineru
   function findScroller(el) {
     if (!el) return null;
@@ -1188,7 +1292,7 @@
   // Nolasa VISAS pasūtījuma rindas, ritinot tabulu vertikāli un horizontāli
   async function extractAllSalesLines(onProgress, knownGroupCodes) {
     const first = extractSalesLines(knownGroupCodes);
-    const anchor = (first[0] && first[0].gridElement) || first.listPart || getBCDocument().querySelector(".ms-nav-listpartform");
+    const anchor = (first[0] && first[0].gridElement) || first.listPart || findSalesLinesListPart(getBCDocument());
     const vScroller = anchor ? (findScroller(anchor) || findScroller(anchor.querySelector('[role="row"], tr') || anchor)) : null;
     const hScroller = anchor ? (findHorizontalScroller(anchor) || findHorizontalScroller(anchor.querySelector('[role="row"], tr') || anchor)) : null;
     if (!vScroller && !hScroller) return first;
@@ -1257,7 +1361,7 @@
     const enrichByAriaRowAtHorizontalStep = (currentScrollLeft) => {
       try {
         const bcDoc = getBCDocument();
-        const lp = first.listPart || bcDoc.querySelector(".ms-nav-listpartform");
+        const lp = first.listPart || findSalesLinesListPart(bcDoc);
         if (!lp) return;
         const headers = Array.from(lp.querySelectorAll('table.ms-nav-grid-header-table th, [role="columnheader"], th'));
         let grpAria = null;
@@ -1969,7 +2073,7 @@
 
       // Fona papildu rindu pārbaude (ja tabula ir ritināma 2D virzienā, nebloķējot lietotāju)
       setTimeout(() => {
-        const anchor = (lines[0] && lines[0].gridElement) || getBCDocument().querySelector('.ms-nav-listpartform');
+        const anchor = (lines[0] && lines[0].gridElement) || findSalesLinesListPart(getBCDocument());
         const vScroller = anchor ? findScroller(anchor) : null;
         const hScroller = anchor ? findHorizontalScroller(anchor) : null;
         const needs2DScan =
@@ -2132,7 +2236,7 @@
     let row = findRowNow(line, bcDoc);
     if (row) return row;
     let anchor = (line.gridElement && line.gridElement.isConnected) ? line.gridElement
-      : bcDoc.querySelector('.ms-nav-listpartform [role="grid"], .ms-nav-listpartform table, .ms-nav-listpartform');
+      : findSalesLinesListPart(bcDoc);
     const scroller = anchor ? findScroller(anchor) : null;
     if (!scroller) return null;
 
@@ -2170,7 +2274,7 @@
     if (!hScroller) {
       const anchor = (line && line.gridElement && line.gridElement.isConnected)
         ? line.gridElement
-        : bcDoc.querySelector('.ms-nav-listpartform');
+        : findSalesLinesListPart(bcDoc);
       hScroller = findHorizontalScroller(anchor);
     }
     if (!hScroller) return getDiscountCellForRow(row, line, bcDoc);

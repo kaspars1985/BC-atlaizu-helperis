@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BC atlaižu helperis",
-  "version": "1.3.7",
+  "version": "1.3.8",
   "description": "Vieds palīgs AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Business Central.",
   "permissions": [
     "storage",
