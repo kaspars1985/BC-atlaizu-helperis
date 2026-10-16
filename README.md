@@ -3,7 +3,7 @@
 <p align="center">
   <img src="icons/icon128.png" width="96" height="96" alt="BC Atlaižu Helperis Logo" /><br>
   <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest"><img src="https://img.shields.io/github/v/release/kaspars1985/BC-atlaizu-helperis?label=Laidiens&color=ff5501" alt="Latest Release"></a>
-  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v1.3.8/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
+  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v1.3.9/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
 </p>
 
 Vieds un ērts **Microsoft Edge** un **Google Chrome** pārlūka paplašinājums AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un zibenīga piemērošana **Microsoft Dynamics 365 Business Central**.

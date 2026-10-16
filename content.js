@@ -12,7 +12,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "1.3.8";
+  const APP_VERSION = "1.3.9";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -39,10 +39,73 @@
   }
 
   function parseNum(str) {
-    const n = parseFloat(String(str || "").replace(/\s/g, "").replace("%", "").replace(",", "."));
+    let s = String(str == null ? "" : str).replace(/\s/g, "").replace(/%/g, "");
+    if (!s) return 0;
+
+    const hasComma = s.indexOf(",") !== -1;
+    const hasDot = s.indexOf(".") !== -1;
+
+    if (hasComma && hasDot) {
+      // The last occurring separator is the decimal separator.
+      if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+        // European: '.' thousands, ',' decimal
+        s = s.replace(/\./g, "").replace(",", ".");
+      } else {
+        // US: ',' thousands, '.' decimal
+        s = s.replace(/,/g, "");
+      }
+    } else if (hasComma) {
+      // Only commas present.
+      if (/,\d{3}$/.test(s) && (s.match(/,/g) || []).length > 1) {
+        // e.g. '1,000,000' -> thousands separators
+        s = s.replace(/,/g, "");
+      } else {
+        s = s.replace(",", ".");
+      }
+    }
+
+    const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   }
 
+  function detectBcDecimalSeparator(bcDoc) {
+    const doc = bcDoc || (typeof getBCDocument === "function" ? getBCDocument() : null);
+    if (!doc) return ",";
+
+    let cells = [];
+    if (typeof findSalesLinesListPart === "function") {
+      const part = findSalesLinesListPart(doc);
+      if (part) {
+        cells = part.querySelectorAll ? part.querySelectorAll("td, th, span, div") : [];
+      }
+    }
+    if (!cells || !cells.length) {
+      cells = doc.querySelectorAll ? doc.querySelectorAll("td, th, span, div") : [];
+    }
+
+    let sawDot = false;
+    let sawComma = false;
+    for (let i = 0; i < cells.length; i++) {
+      const el = cells[i];
+      if (el.offsetParent === null && el.getClientRects && el.getClientRects().length === 0) continue;
+      const txt = (el.textContent || "").trim();
+      if (!/^\d+[.,]\d{2,3}$/.test(txt)) continue;
+      if (txt.indexOf(".") !== -1) sawDot = true;
+      if (txt.indexOf(",") !== -1) sawComma = true;
+      if (sawDot && sawComma) break;
+    }
+
+    if (sawDot && !sawComma) return ".";
+    return ",";
+  }
+
+  function formatBcNumber(num, bcDoc) {
+    const s = String(num);
+    if (detectBcDecimalSeparator(bcDoc) === ".") {
+      return s.replace(",", ".");
+    }
+    return s.replace(".", ",");
+  }
   async function waitFor(fn, timeoutMs, stepMs = 50) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -1093,7 +1156,7 @@
         const realIdx = colIndices.qty + rowOffset;
         if (realIdx >= 0 && realIdx < cells.length) rawQty = getCellVal(realIdx);
       }
-      const qty = parseFloat((rawQty || "1").replace(",", ".").replace(/\s/g, "")) || 1;
+      const qty = parseNum(rawQty || "1") || 1;
 
       // Šūna, kurā ierakstīt atlaidi
       let discountCell = null;
@@ -1113,14 +1176,14 @@
       if (discountCell) {
         const inp = discountCell.querySelector("input");
         const val = (inp ? inp.value : (discountCell.innerText || discountCell.textContent || "")).trim();
-        const parsed = parseFloat(val.replace(",", ".").replace(/\s/g, ""));
+        const parsed = parseNum(val);
         if (!isNaN(parsed)) currentDiscount = parsed;
       }
       if (currentDiscount === 0 && colIndices.discount >= 0) {
         const realIdx = colIndices.discount + rowOffset;
         if (realIdx >= 0 && realIdx < cells.length) {
           const rawDiscount = getCellVal(realIdx);
-          currentDiscount = parseFloat(rawDiscount.replace(",", ".").replace(/\s/g, "")) || 0;
+          currentDiscount = parseNum(rawDiscount) || 0;
         }
       }
 
@@ -1514,16 +1577,40 @@
     return data.rules;
   }
 
-  // Palīgfunkcija latviešu datuma (DD.MM.YYYY vai DD.MM.YY) parsēšanai
+
+  // Palīgfunkcija datuma (DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD u.c.) parsēšanai
   function parseLvDate(str) {
     if (!str) return null;
-    const m = String(str).trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+    const s = String(str).trim();
+
+    // ISO: YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD
+    let m = s.match(/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})$/);
+    if (m) {
+      const year = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      const day = parseInt(m[3], 10);
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      return new Date(year, month - 1, day);
+    }
+
+    // DD.MM.YYYY / DD/MM/YYYY / DD-MM-YYYY (2-digit year -> 20YY)
+    m = s.match(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{2,4})$/);
     if (!m) return null;
-    let y = parseInt(m[3], 10);
-    if (y < 100) y += 2000;
-    const month = parseInt(m[2], 10) - 1;
-    const day = parseInt(m[1], 10);
-    return new Date(y, month, day);
+
+    let day = parseInt(m[1], 10);
+    let month = parseInt(m[2], 10);
+    let year = parseInt(m[3], 10);
+    if (year < 100) year += 2000;
+
+    // US MM/DD/YYYY: second part > 12 and first part <= 12 -> swap
+    if (month > 12 && day <= 12) {
+      const tmp = day;
+      day = month;
+      month = tmp;
+    }
+
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return new Date(year, month - 1, day);
   }
 
   // Pārbauda, vai atlaižu noteikuma datums ir aktīvs šodien
@@ -1774,7 +1861,7 @@
               <div class="bcm-logo-icon">⚡</div>
               <div>
                 <h3 class="bcm-modal-title" style="display: flex; align-items: center; gap: 8px;">
-                  <span>BC Atlaižu Helperis · Atlaižu Pārvaldnieks</span>
+                  <span>BC Atlaižu Helperis <small style="font-weight:600;opacity:0.75;">v${APP_VERSION}</small> · Atlaižu Pārvaldnieks</span>
                   ${updateInfo && updateInfo.hasUpdate ? `<a href="${updateInfo.releaseUrl}" target="_blank" style="text-decoration: none; font-size: 11px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 2px 7px; border-radius: 12px; font-weight: 600;">🚀 Pieejama v${escapeHtml(updateInfo.latestVersion)}</a>` : ""}
                 </h3>
                 <div class="bcm-modal-subtitle">Pasūtījums: ${headerInfo.orderNo || "Pārdošanas pasūtījums"} · AM Furnitūra</div>
@@ -2339,7 +2426,7 @@
 
   // Ieraksta atlaidi vienā rindā ar svaigu rindas/šūnas noteikšanu, commit (Tab) un verifikāciju
   async function writeDiscountForLine(line, bcDoc) {
-    const valStr = String(line.newDiscount).replace(".", ",");
+    const valStr = formatBcNumber(line.newDiscount, bcDoc);
     for (let attempt = 1; attempt <= 3; attempt++) {
       let row = await resolveRow(line, bcDoc);
       if (!row) {
@@ -2439,7 +2526,8 @@
 
     // Rezerves nolūkam iekopējam VISAS rindas buferī (lai ielīmēšana sakristu 1:1)
     try {
-      const discountsText = lines.map(l => String(l.newDiscount).replace(".", ",")).join("\r\n");
+      const bcDocClip = getBCDocument();
+      const discountsText = lines.map(l => formatBcNumber(l.newDiscount, bcDocClip)).join("\r\n");
       await navigator.clipboard.writeText(discountsText);
     } catch (e) {}
 
@@ -2490,7 +2578,8 @@
 
   function copyDiscountsToClipboard(lines) {
     const targetLines = lines;
-    const discountsText = targetLines.map(l => String(l.newDiscount !== undefined ? l.newDiscount : (l.currentDiscount || 0)).replace(".", ",")).join("\r\n");
+    const bcDocClip = getBCDocument();
+    const discountsText = targetLines.map(l => formatBcNumber(l.newDiscount !== undefined ? l.newDiscount : (l.currentDiscount || 0), bcDocClip)).join("\r\n");
     navigator.clipboard.writeText(discountsText).then(() => {
       showToast(`📋 Atlaižu kolonna (${targetLines.length} rindām) nokopēta buferī!`, "success");
     }).catch(err => {
@@ -2648,8 +2737,7 @@
   }
 
   function parseLvNumber(s) {
-    const n = parseFloat(String(s || "").replace(/\s/g, "").replace(",", "."));
-    return isNaN(n) ? 0 : n;
+    return parseNum(s);
   }
 
   function setBanner(type, message, showDiagnosticsBtn = false) {
