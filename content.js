@@ -12,7 +12,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "1.3.9";
+  const APP_VERSION = "2.0.0";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -106,7 +106,7 @@
     }
     return s.replace(".", ",");
   }
-  async function waitFor(fn, timeoutMs, stepMs = 50) {
+  async function waitFor(fn, timeoutMs, stepMs = 12) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       try {
@@ -491,6 +491,33 @@
     for (const d of docs) {
       const titleMatch = ((d.title || "") + " " + (document.title || "")).match(/PPAS\d+/i);
       if (titleMatch && !info.orderNo) info.orderNo = titleMatch[0].toUpperCase();
+
+      if (!info.orderNo) {
+        const headings = Array.from(d.querySelectorAll('.ms-nav-layout-head-caption, [role="heading"]'));
+        for (const h of headings) {
+          const txt = (h.innerText || h.textContent || "").trim();
+          const m = txt.match(/[∙•\-]\s*([A-Za-z0-9_-]+)/) || txt.match(/\b((?:PPAS|AV)[0-9]+)\b/i);
+          if (m && m[1]) {
+            info.orderNo = m[1].toUpperCase();
+            break;
+          }
+        }
+      }
+
+      if (!info.orderNo) {
+        const salesPart = findSalesLinesListPart(d);
+        const noControls = Array.from(d.querySelectorAll('[controlname="No."], [controlname="No"]'));
+        for (const nc of noControls) {
+          if (salesPart && salesPart.contains(nc)) continue;
+          if (isInsideFactBox(nc)) continue;
+          const inp = nc.querySelector("input, .ms-nav-edit-control") || nc;
+          const val = (inp.value || inp.innerText || "").trim();
+          if (val && !/nr\.?$/i.test(val) && val.length >= 3 && val.length <= 25) {
+            info.orderNo = val;
+            break;
+          }
+        }
+      }
 
       const inputs = Array.from(d.querySelectorAll("input, div[role='textbox'], .ms-nav-edit-control, [aria-label], [title]"));
 
@@ -1360,12 +1387,18 @@
     const hScroller = anchor ? (findHorizontalScroller(anchor) || findHorizontalScroller(anchor.querySelector('[role="row"], tr') || anchor)) : null;
     if (!vScroller && !hScroller) return first;
 
+    const needGroup = !!(knownGroupCodes && ((knownGroupCodes instanceof Set && knownGroupCodes.size > 0) || (Array.isArray(knownGroupCodes) && knownGroupCodes.length > 0)));
+    const needsVert = !!(vScroller && vScroller.scrollHeight > vScroller.clientHeight + 40);
+    const needsHoriz = !!(hScroller && hScroller.scrollWidth > hScroller.clientWidth + 15 && (!first.hasDiscountColumn || (needGroup && !first.hasGroupColumn)));
+    if (!needsVert && !needsHoriz) return first;
+
     bcmBusy = true;
     const origTop = vScroller ? vScroller.scrollTop : 0;
     const origLeft = hScroller ? hScroller.scrollLeft : 0;
     const merged = new Map();
     let hasDiscountColumn = false;
     let hasGroupColumn = false;
+    let discoveredHorizLeft = null;
 
     const keyOf = (l, occ) => l.ariaRowIndex ? `r${l.ariaRowIndex}` : `${l.itemCode}|${l.qty}|${l.rowCellTexts.join("|")}#${occ}`;
 
@@ -1473,24 +1506,47 @@
     // Horizontālā skenēšana pie esošās vertikālās pozīcijas
     const scanHorizontalAtCurrentVertical = async () => {
       if (!hScroller) return;
-      if (hScroller.scrollWidth <= hScroller.clientWidth + 15) return;
-      const maxLeft = hScroller.scrollWidth - hScroller.clientWidth;
-      const stepSize = Math.max(200, Math.floor(hScroller.clientWidth * 0.65));
+      if (!needsHoriz || (first.hasDiscountColumn && (!needGroup || first.hasGroupColumn))) return;
+
+      const columnsFound = () => hasDiscountColumn && (!needGroup || hasGroupColumn);
+
       const savedLeft = hScroller.scrollLeft;
       try {
-        for (let left = 0; left <= maxLeft; left += stepSize) {
-          hScroller.scrollLeft = left;
-          await sleep(150);
+        if (columnsFound() && discoveredHorizLeft !== null) {
+          hScroller.scrollLeft = discoveredHorizLeft;
+          await sleep(65);
           addSnapshot(extractSalesLines(knownGroupCodes), hScroller.scrollLeft);
           enrichByAriaRowAtHorizontalStep(hScroller.scrollLeft);
           if (typeof onProgress === "function") onProgress(merged.size);
+          return;
         }
-        // Pēdējais solis, ja solis nepārklāj pašu galu
-        if (hScroller.scrollLeft < maxLeft) {
-          hScroller.scrollLeft = maxLeft;
-          await sleep(150);
+
+        const maxLeft = hScroller.scrollWidth - hScroller.clientWidth;
+        const stepSize = Math.max(200, Math.floor(hScroller.clientWidth * 0.65));
+        for (let left = 0; left <= maxLeft; left += stepSize) {
+          hScroller.scrollLeft = left;
+          await sleep(65);
           addSnapshot(extractSalesLines(knownGroupCodes), hScroller.scrollLeft);
           enrichByAriaRowAtHorizontalStep(hScroller.scrollLeft);
+          if (columnsFound() && discoveredHorizLeft === null) {
+            discoveredHorizLeft = hScroller.scrollLeft;
+            const bcDoc = getBCDocument();
+            if (bcDoc) bcDoc.__bcmDiscountScrollLeft = discoveredHorizLeft;
+          }
+          if (typeof onProgress === "function") onProgress(merged.size);
+          if (columnsFound() && discoveredHorizLeft !== null) break;
+        }
+        // Pēdējais solis, ja solis nepārklāj pašu galu
+        if (!columnsFound() && hScroller.scrollLeft < maxLeft) {
+          hScroller.scrollLeft = maxLeft;
+          await sleep(65);
+          addSnapshot(extractSalesLines(knownGroupCodes), hScroller.scrollLeft);
+          enrichByAriaRowAtHorizontalStep(hScroller.scrollLeft);
+          if (columnsFound() && discoveredHorizLeft === null) {
+            discoveredHorizLeft = hScroller.scrollLeft;
+            const bcDoc = getBCDocument();
+            if (bcDoc) bcDoc.__bcmDiscountScrollLeft = discoveredHorizLeft;
+          }
           if (typeof onProgress === "function") onProgress(merged.size);
         }
       } finally {
@@ -1501,9 +1557,9 @@
     try {
       addSnapshot(first, origLeft);
 
-      if (vScroller) {
+      if (vScroller && needsVert) {
         vScroller.scrollTop = 0;
-        await sleep(150);
+        await sleep(65);
         addSnapshot(extractSalesLines(knownGroupCodes), hScroller ? hScroller.scrollLeft : 0);
         await scanHorizontalAtCurrentVertical();
 
@@ -1511,7 +1567,7 @@
           const prevTop = vScroller.scrollTop;
           const scrollDelta = Math.max(80, Math.floor(vScroller.clientHeight * 0.7));
           vScroller.scrollTop += scrollDelta;
-          await sleep(150);
+          await sleep(65);
 
           addSnapshot(extractSalesLines(knownGroupCodes), hScroller ? hScroller.scrollLeft : 0);
           await scanHorizontalAtCurrentVertical();
@@ -1520,12 +1576,12 @@
 
           if (vScroller.scrollTop === prevTop || vScroller.scrollTop + vScroller.clientHeight >= vScroller.scrollHeight - 2) {
             const beforeHeight = vScroller.scrollHeight;
-            await sleep(200);
+            await sleep(80);
             if (vScroller.scrollHeight === beforeHeight) break;
           }
         }
       } else {
-        // Nav vertikālā ritinātāja — skenējam tikai horizontāli
+        // Nav vertikālā ritinātāja (vai nav vajadzīgs vertikālais skens) — skenējam tikai horizontāli
         await scanHorizontalAtCurrentVertical();
       }
     } catch (e) {
@@ -1793,6 +1849,70 @@
 
       // 2. ZIBENĪGI nolasām uzreiz redzamās rindas, lai modālis atvērtos uzreiz (<10ms)
       const rawLines = extractSalesLines(knownGroupCodes);
+
+      if (headerInfo.orderNo) {
+        try {
+          const odataRes = await chrome.runtime.sendMessage({
+            action: "ODATA_GET_ORDER_LINES",
+            orderNo: headerInfo.orderNo
+          }).catch(() => null);
+
+          if (odataRes && odataRes.success && Array.isArray(odataRes.lines) && odataRes.lines.length > 0) {
+            const odataItems = odataRes.lines.filter(r => r.type === "Item" && r.number);
+            if (odataItems.length > 0) {
+              const odataCodeCounts = {};
+              const odataEnriched = [];
+
+              for (const oRow of odataItems) {
+                const code = String(oRow.number || "").trim().toUpperCase();
+                const ord = odataCodeCounts[code] || 0;
+                odataCodeCounts[code] = ord + 1;
+
+                const domLine = rawLines.find(l => String(l.itemCode || "").trim().toUpperCase() === code && (l.ordinal || 0) === ord);
+
+                if (domLine) {
+                  domLine.lineNumber = oRow.lineNumber;
+                  domLine.documentType = oRow.documentType;
+                  domLine.documentNumber = oRow.documentNumber;
+                  domLine.groupCode = domLine.groupCode || oRow.itemCategoryCode || "";
+                  domLine.uom = domLine.uom || oRow.unitOfMeasureCode || oRow.unitOfMeasure || "";
+                  domLine.currentDiscount = Number(oRow.lineDiscountPercent) || domLine.currentDiscount || 0;
+                  odataEnriched.push(domLine);
+                } else {
+                  odataEnriched.push({
+                    id: `line_odata_${oRow.lineNumber}_${code}`,
+                    rowIndex: odataEnriched.length + 1,
+                    itemCode: oRow.number,
+                    description: oRow.description || "",
+                    qty: Number(oRow.quantity) || 1,
+                    uom: oRow.unitOfMeasureCode || oRow.unitOfMeasure || "",
+                    groupCode: oRow.itemCategoryCode || "",
+                    currentDiscount: Number(oRow.lineDiscountPercent) || 0,
+                    newDiscount: Number(oRow.lineDiscountPercent) || 0,
+                    lineNumber: oRow.lineNumber,
+                    documentType: oRow.documentType,
+                    documentNumber: oRow.documentNumber,
+                    ordinal: ord,
+                    matchedReason: "Gaida aprēķinu",
+                    status: "idle"
+                  });
+                }
+              }
+
+              rawLines.length = 0;
+              odataEnriched.forEach((l, idx) => {
+                l.rowIndex = idx + 1;
+                rawLines.push(l);
+              });
+              rawLines.hasDiscountColumn = true;
+              rawLines.hasGroupColumn = true;
+              rawLines.odataLoaded = true;
+            }
+          }
+        } catch (e) {
+          console.warn("[BC Atlaižu Helperis] OData ielādes kļūda:", e);
+        }
+      }
 
       let lines = await matchDiscountsForLines(rawLines, headerInfo.relatedCustomerNo);
       let updateInfo = null;
@@ -2160,15 +2280,17 @@
 
       // Fona papildu rindu pārbaude (ja tabula ir ritināma 2D virzienā, nebloķējot lietotāju)
       setTimeout(() => {
+        if (rawLines.odataLoaded || lines.odataLoaded) {
+          updateColumnWarnings(lines, true);
+          return;
+        }
         const anchor = (lines[0] && lines[0].gridElement) || findSalesLinesListPart(getBCDocument());
         const vScroller = anchor ? findScroller(anchor) : null;
         const hScroller = anchor ? findHorizontalScroller(anchor) : null;
-        const needs2DScan =
-          (vScroller && vScroller.scrollHeight > vScroller.clientHeight + 40) ||
-          (hScroller && hScroller.scrollWidth > hScroller.clientWidth + 20) ||
-          !lines.hasDiscountColumn ||
-          !lines.hasGroupColumn;
-        if (needs2DScan && (vScroller || hScroller)) {
+        const hasGroupRules = knownGroupCodes.size > 0;
+        const needsVertScan = !!(vScroller && vScroller.scrollHeight > vScroller.clientHeight + 40);
+        const needsHorizScan = !!(hScroller && hScroller.scrollWidth > hScroller.clientWidth + 20 && (!lines.hasDiscountColumn || (hasGroupRules && !lines.hasGroupColumn)));
+        if (needsVertScan || needsHorizScan) {
           const scanBtn = modal.querySelector("#bcm-scan-all-lines-btn");
           if (scanBtn && !scanBtn.disabled) {
             scanBtn.click();
@@ -2176,7 +2298,7 @@
         } else {
           updateColumnWarnings(lines, true);
         }
-      }, 400);
+      }, 120);
 
     } catch (err) {
       console.error("[BC Atlaižu Helperis] Kļūda atverot modālo logu:", err);
@@ -2331,7 +2453,7 @@
     for (let step = 0; step < 20; step++) {
       const prev = scroller.scrollTop;
       scroller.scrollTop += Math.max(60, Math.floor(scroller.clientHeight * 0.7));
-      await sleep(150);
+      await sleep(55);
       row = findRowNow(line, bcDoc);
       if (row) return row;
       if (scroller.scrollTop === prev) break;
@@ -2341,7 +2463,7 @@
     for (let step = 0; step < 25; step++) {
       const prev = scroller.scrollTop;
       scroller.scrollTop -= Math.max(60, Math.floor(scroller.clientHeight * 0.7));
-      await sleep(150);
+      await sleep(55);
       row = findRowNow(line, bcDoc);
       if (row) return row;
       if (scroller.scrollTop === prev) break;
@@ -2367,12 +2489,19 @@
     if (!hScroller) return getDiscountCellForRow(row, line, bcDoc);
 
     // 3. Ja zinām iepriekšējo horizontālo pozīciju, mēģinām to uzreiz
-    if (line && typeof line.discountScrollLeft === "number") {
-      hScroller.scrollLeft = line.discountScrollLeft;
-      await sleep(120);
+    const cachedLeft = (line && typeof line.discountScrollLeft === "number")
+      ? line.discountScrollLeft
+      : (bcDoc ? bcDoc.__bcmDiscountScrollLeft : undefined);
+    if (typeof cachedLeft === "number") {
+      hScroller.scrollLeft = cachedLeft;
+      await sleep(50);
       row = findRowNow(line, bcDoc) || row;
       cell = getDiscountCellForRow(row, line, bcDoc);
-      if (cell && cell.getBoundingClientRect().width > 0) return cell;
+      if (cell && cell.getBoundingClientRect().width > 0) {
+        if (line) line.discountScrollLeft = hScroller.scrollLeft;
+        if (bcDoc) bcDoc.__bcmDiscountScrollLeft = hScroller.scrollLeft;
+        return cell;
+      }
     }
 
     // 4. Soli pa solim ritinām horizontāli, līdz atrodam šūnu
@@ -2380,11 +2509,12 @@
     const maxLeft = hScroller.scrollWidth;
     for (let left = 0; left <= maxLeft; left += stepSize) {
       hScroller.scrollLeft = left;
-      await sleep(100);
+      await sleep(50);
       row = findRowNow(line, bcDoc) || row;
       cell = getDiscountCellForRow(row, line, bcDoc);
       if (cell && cell.getBoundingClientRect().width > 0) {
         if (line) line.discountScrollLeft = hScroller.scrollLeft;
+        if (bcDoc) bcDoc.__bcmDiscountScrollLeft = hScroller.scrollLeft;
         return cell;
       }
     }
@@ -2424,18 +2554,18 @@
     el.dispatchEvent(new KeyboardEvent("keyup", opts));
   }
 
-  // Ieraksta atlaidi vienā rindā ar svaigu rindas/šūnas noteikšanu, commit (Tab) un verifikāciju
+  // Ieraksta atlaidi vienā rindā ar precīzu BC cikla sinhronizāciju pirmajā piegājienā
   async function writeDiscountForLine(line, bcDoc) {
     const valStr = formatBcNumber(line.newDiscount, bcDoc);
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      let row = await resolveRow(line, bcDoc);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let row = findRowNow(line, bcDoc) || await resolveRow(line, bcDoc);
       if (!row) {
         bcmLog("WRITE_ROW_NOT_FOUND", { item: line.itemCode, ordinal: line.ordinal, attempt });
         continue;
       }
 
       // Nodrošinām, ka atlaides šūna ir redzama (horizontālā virtualizācija)
-      let cell = await ensureDiscountCellVisible(row, line, bcDoc);
+      let cell = getDiscountCellForRow(row, line, bcDoc) || await ensureDiscountCellVisible(row, line, bcDoc);
       if (!cell) {
         bcmLog("WRITE_CELL_NOT_FOUND", { item: line.itemCode, attempt, ariaIdx: line.discountAriaColIndex, colIdx: line.discountColIndex });
         continue;
@@ -2449,17 +2579,27 @@
         cell = getDiscountCellForRow(row, line, bcDoc) || cell;
       }
 
+      const currentVal = readCellValue(cell);
+      if (currentVal !== null && Math.abs(currentVal - line.newDiscount) < 0.05) {
+        ensureHighlightStyles(cell.ownerDocument || document);
+        highlightCell(cell);
+        return { ok: true, cell };
+      }
+
       const doc = cell.ownerDocument || document;
       ensureHighlightStyles(doc);
-      cell.scrollIntoView({ behavior: "instant", block: "center", inline: "center" });
-      await nextFrame();
-      await nextFrame();
+      const rect = cell.getBoundingClientRect();
+      const win = doc.defaultView || window;
+      if (rect.top < 0 || rect.bottom > win.innerHeight || rect.left < 0 || rect.right > win.innerWidth) {
+        cell.scrollIntoView({ behavior: "instant", block: "nearest", inline: "nearest" });
+        await nextFrame();
+      }
       highlightCell(cell);
 
       let inp = cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null);
       if (!inp) {
         clickAt(cell);
-        inp = await waitFor(() => cell.isConnected && (cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null)), 800);
+        inp = await waitFor(() => cell.isConnected && (cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null)), 400, 15);
       }
       if (!inp) {
         const inner = cell.firstElementChild || cell;
@@ -2467,12 +2607,15 @@
         try {
           inner.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true, view: doc.defaultView }));
         } catch (e) {}
-        inp = await waitFor(() => cell.isConnected && (cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null)), 800);
+        inp = await waitFor(() => cell.isConnected && (cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null)), 400, 15);
       }
       if (!inp) {
         bcmLog("WRITE_NO_INPUT", { item: line.itemCode, attempt });
         continue;
       }
+
+      // Ļaujam BC pabeigt fokusa/izlases inicializāciju jaunajā input laukā (~25ms), lai BC nepārraksta mūsu vērtību ar 0,00
+      await sleep(25);
 
       try {
         inp.focus();
@@ -2493,9 +2636,10 @@
         const r = findRowNow(line, bcDoc);
         const c = r && getDiscountCellForRow(r, line, bcDoc);
         if (!c) return null;
+        if (c.querySelector("input")) return null; // Gaidām, kamēr BC aizver input un saglabā vērtību šūnā
         const val = readCellValue(c);
         return Math.abs(val - target) < 0.05 ? c : null;
-      }, 1500, 40);
+      }, 800, 15);
 
       if (verified) return { ok: true, cell: verified };
       bcmLog("WRITE_VERIFY_FAILED", { item: line.itemCode, attempt, target, readVal: readCellValue(cell) });
@@ -2536,15 +2680,81 @@
 
     try {
       const bcDoc = getBCDocument();
-      resetGridSelection(bcDoc);
-      await sleep(100);
-
-      showToast(`⚡ Automātiski ieraksta atlaides ${total} rindās...`, "info");
-
       const touchedCells = [];
+
+      // 1. Mēģinām momentālo OData API ierakstīšanu
+      const headerInfo = extractHeaderCustomerInfo();
+      const orderNo = (lines[0] && lines[0].documentNumber) || headerInfo.orderNo;
+      let remainingLines = linesToUpdate;
+
+      if (orderNo) {
+        showToast(`⚡ Momentāli ieraksta atlaides serverī (${total} rindās)...`, "info");
+        try {
+          const odataRes = await chrome.runtime.sendMessage({
+            action: "ODATA_APPLY_DISCOUNTS",
+            orderNo,
+            updates: linesToUpdate.map(l => ({
+              id: l.id,
+              itemCode: l.itemCode,
+              ordinal: l.ordinal || 0,
+              newDiscount: l.newDiscount,
+              lineNumber: l.lineNumber,
+              documentType: l.documentType,
+              documentNumber: l.documentNumber
+            }))
+          });
+
+          if (odataRes && odataRes.success) {
+            const failedSet = new Set(odataRes.failedIds || []);
+            const succeededLines = linesToUpdate.filter(l => !failedSet.has(l.id));
+
+            for (const l of succeededLines) {
+              const r = findRowNow(l, bcDoc);
+              const c = r && getDiscountCellForRow(r, l, bcDoc);
+              if (c) {
+                ensureHighlightStyles(c.ownerDocument || bcDoc);
+                highlightCell(c);
+                touchedCells.push(c);
+                const txtVal = formatBcNumber(l.newDiscount, bcDoc);
+                if (!c.querySelector("input")) {
+                  const targetEl = c.querySelector(".stringcontrol-read, span") || c;
+                  if (targetEl) targetEl.textContent = txtVal;
+                }
+              }
+            }
+
+            try {
+              sendKey(bcDoc.activeElement || bcDoc.body, "F5", 116);
+            } catch (e) {}
+
+            if (!odataRes.failedIds || odataRes.failedIds.length === 0) {
+              setTimeout(() => touchedCells.forEach(clearCellHighlight), 1000);
+              const onAnyClick = () => {
+                touchedCells.forEach(clearCellHighlight);
+                clearAllHighlights();
+                window.removeEventListener("click", onAnyClick, true);
+              };
+              window.addEventListener("click", onAnyClick, true);
+              showToast(`✅ Momentāli ierakstītas atlaides ${odataRes.updatedCount} no ${total} rindām!`, "success");
+              return;
+            }
+
+            remainingLines = linesToUpdate.filter(l => failedSet.has(l.id));
+          }
+        } catch (err) {
+          console.warn("[BC Atlaižu Helperis] OData apply kļūda, pārejam uz DOM ievadi:", err);
+        }
+      }
+
+      // 2. DOM fallback ierakstīšana neizdevušajām vai visām rindām
+      resetGridSelection(bcDoc);
+      await nextFrame();
+
+      showToast(`⚡ Automātiski ieraksta atlaides ${remainingLines.length} rindās...`, "info");
+
       const failed = [];
-      let successCount = 0;
-      for (const line of linesToUpdate) {
+      let successCount = total - remainingLines.length;
+      for (const line of remainingLines) {
         const res = await writeDiscountForLine(line, bcDoc);
         if (res.ok) {
           successCount++;

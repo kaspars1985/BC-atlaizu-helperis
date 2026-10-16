@@ -160,6 +160,150 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  // ODataV4 palīgfunkcijas
+  function getCompanyFromUrl(url) {
+    if (!url) return "AM Furnitūra EUR";
+    try {
+      const parsed = new URL(url);
+      const comp = parsed.searchParams.get("company");
+      if (comp) return decodeURIComponent(comp);
+    } catch (e) {}
+    return "AM Furnitūra EUR";
+  }
+
+  async function fetchODataWithAuth(url, options = {}) {
+    let res = await fetch(url, { credentials: "include", ...options });
+    if (res.status === 401) {
+      try {
+        const authTab = await chrome.tabs.create({
+          url: "https://amfbc.amf.lv:7048/AMF/ODataV4/Company('AM%20Furnit%C5%ABra%20EUR')/salesDocumentLines?$top=1",
+          active: false
+        });
+        await new Promise(r => setTimeout(r, 1500));
+        if (authTab && authTab.id) {
+          try { await chrome.tabs.remove(authTab.id); } catch (e) {}
+        }
+        res = await fetch(url, { credentials: "include", ...options });
+      } catch (e) {
+        console.warn("[BC Helper BG] Auth tab retry failed:", e);
+      }
+    }
+    return res;
+  }
+
+  // ODataV4: Pasūtījuma rindu nolasīšana
+  if (request.action === "ODATA_GET_ORDER_LINES") {
+    (async () => {
+      try {
+        const company = request.company || getCompanyFromUrl(sender.tab?.url);
+        const orderNo = String(request.orderNo || "").trim();
+        if (!orderNo) {
+          sendResponse({ success: false, error: "NO_ORDER_NO" });
+          return;
+        }
+        const odataUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
+        const res = await fetchODataWithAuth(odataUrl, {
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          sendResponse({ success: true, lines: data.value || [] });
+        } else {
+          sendResponse({ success: false, status: res.status, error: await res.text() });
+        }
+      } catch (err) {
+        sendResponse({ success: false, error: String(err) });
+      }
+    })();
+    return true;
+  }
+
+  // ODataV4: Atlaižu momentālā ierakstīšana (PATCH)
+  if (request.action === "ODATA_APPLY_DISCOUNTS") {
+    (async () => {
+      try {
+        const company = request.company || getCompanyFromUrl(sender.tab?.url);
+        const orderNo = String(request.orderNo || "").trim();
+        const updates = Array.isArray(request.updates) ? request.updates : [];
+        if (!orderNo) {
+          sendResponse({ success: false, error: "NO_ORDER_NO" });
+          return;
+        }
+
+        // 1. solis: Ielasa aktuālās pasūtījuma rindas
+        const getUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
+        const getRes = await fetchODataWithAuth(getUrl, {
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        });
+        if (!getRes.ok) {
+          sendResponse({ success: false, status: getRes.status, error: await getRes.text() });
+          return;
+        }
+        const getData = await getRes.json();
+        const serverLines = getData.value || [];
+
+        // 2. solis: Katram u no updates
+        let updatedCount = 0;
+        const failedIds = [];
+
+        for (const u of updates) {
+          let targetRow = null;
+          if (u.lineNumber) {
+            targetRow = serverLines.find(r => r.lineNumber === u.lineNumber);
+          }
+          if (!targetRow && u.itemCode) {
+            const code = String(u.itemCode || "").trim().toUpperCase();
+            const matchedRows = serverLines
+              .filter(r => r.type === "Item" && String(r.number || "").trim().toUpperCase() === code)
+              .sort((a, b) => (Number(a.lineNumber) || 0) - (Number(b.lineNumber) || 0));
+            const ordIdx = Number(u.ordinal) || 0;
+            targetRow = matchedRows[ordIdx] || matchedRows[0] || null;
+          }
+
+          if (!targetRow) {
+            failedIds.push(u.id);
+            continue;
+          }
+
+          if (Math.abs((Number(targetRow.lineDiscountPercent) || 0) - Number(u.newDiscount)) < 0.05) {
+            updatedCount++;
+            continue;
+          }
+
+          const patchUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines(documentType='${encodeURIComponent(targetRow.documentType)}',documentNumber='${encodeURIComponent(targetRow.documentNumber)}',lineNumber=${targetRow.lineNumber})`;
+          const patchOptions = {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "If-Match": "*"
+            },
+            body: JSON.stringify({ lineDiscountPercent: Number(u.newDiscount) })
+          };
+
+          let patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
+          if (!patchRes.ok && [409, 412, 500].includes(patchRes.status)) {
+            await new Promise(r => setTimeout(r, 40));
+            patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
+          }
+
+          if (patchRes.ok) {
+            updatedCount++;
+          } else {
+            failedIds.push(u.id);
+          }
+        }
+
+        sendResponse({ success: true, updatedCount, failedIds });
+      } catch (err) {
+        sendResponse({ success: false, error: String(err) });
+      }
+    })();
+    return true;
+  }
+
   // Versijas pārbaude (gan manuāla, gan automātiska)
   if (request.action === "CHECK_FOR_UPDATES") {
     checkVersionUpdate(!!request.force).then(info => {
