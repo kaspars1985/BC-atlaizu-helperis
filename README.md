@@ -3,7 +3,7 @@
 <p align="center">
   <img src="icons/icon128.png" width="96" height="96" alt="BC atlaižu pārvaldnieks Logo" /><br>
   <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest"><img src="https://img.shields.io/github/v/release/kaspars1985/BC-atlaizu-helperis?label=Laidiens&color=ff5501" alt="Latest Release"></a>
-  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v2.1.0/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
+  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v2.1.1/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
 </p>
 
 Vieds un ērts **Microsoft Edge** un **Google Chrome** pārlūka paplašinājums AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un zibenīga piemērošana **Microsoft Dynamics 365 Business Central**.
@@ -20,8 +20,8 @@ Bieži rodas situācija: klients (piemēram, meistars ar kodu `011420`) pasūta 
 3. Nācās manuāli meklēt katrai precei vai preču grupai meistara atlaides un ar roku katrai rindai ierakstīt `Rindas atlaide %`.
 
 ### Ar BC atlaižu pārvaldnieku:
-1. Atverot pasūtījumu (Page 42), ekrāna apakšējā labajā stūrī parādās poga **`⚡ Piemērot atlaides`** ar automātiski atpazītu saistīto klientu.
-2. Uzklikšķinot uz tās, atveras pārskatāms **Atlaižu priekšskatījuma logs**:
+1. Atverot pasūtījumu (Page 42), nospiediet **Alt+D** vai uzklikšķiniet uz rīkjoslas ikonas **"BC atlaižu pārvaldnieks"**.
+2. Atveras pārskatāms **Atlaižu priekšskatījuma logs** (ekrāns ir tīrs, bez traucējošām peldošām pogām):
    - Parāda katru pasūtījuma rindu, artikulu, nosaukumu un daudzumu;
    - Automātiski atrod un aprēķina precīzo atlaides % (pēc preces tiešā koda, pēc preču atlaižu grupas vai vispārējās klienta atlaides);
    - Skaidri norāda atlaides pamatojumu;

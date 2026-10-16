@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BC atlaižu pārvaldnieks",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Vieds palīgs AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Business Central.",
   "permissions": [
     "storage",
@@ -44,6 +44,14 @@
       ]
     }
   ],
+  "commands": {
+    "open_discount_modal": {
+      "suggested_key": {
+        "default": "Alt+D"
+      },
+      "description": "Atvērt BC atlaižu pārvaldnieku"
+    }
+  },
   "action": {
     "default_title": "BC atlaižu pārvaldnieks",
     "default_icon": {

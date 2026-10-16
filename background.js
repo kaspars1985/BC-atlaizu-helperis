@@ -402,12 +402,24 @@ chrome.runtime.onStartup.addListener(() => {
   checkVersionUpdate(false);
 });
 
-// Atver modālo logu aktīvajā cilnē uzklikšķinot uz rīkjoslas ikonas
-chrome.action.onClicked.addListener((tab) => {
+// Atver modālo logu aktīvajā cilnē uzklikšķinot uz rīkjoslas ikonas vai nospiežot Alt+D
+function triggerOpenModal(tab) {
   if (tab && tab.id) {
-    chrome.tabs.sendMessage(tab.id, { action: "OPEN_DISCOUNT_MODAL" }, { frameId: 0 }, () => {
+    chrome.tabs.sendMessage(tab.id, { action: "OPEN_DISCOUNT_MODAL" }, () => {
       if (chrome.runtime.lastError) {}
     });
   }
-});
+}
+
+chrome.action.onClicked.addListener(triggerOpenModal);
+
+if (chrome.commands && chrome.commands.onCommand) {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command === "open_discount_modal") {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs && tabs[0]) triggerOpenModal(tabs[0]);
+      });
+    }
+  });
+}
 

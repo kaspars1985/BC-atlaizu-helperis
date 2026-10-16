@@ -32,9 +32,9 @@ UZSTĀDĪŠANA MICROSOFT EDGE PĀRLŪKĀ (Aizņem 30 sekundes):
 KĀ LIETOT IKDIENĀ:
 ------------------------------------------------------------------------
 1. Atveriet jebkuru pasūtījumu Business Central (PPAS...).
-2. Ja pasūtījumā ir ievadīts "Saistītā klienta nr.", ekrāna apakšā pa labi
-   parādīsies poga: "⚡ Piemērot atlaides".
-3. Uzklikšķiniet uz tās - atvērsies priekšskatījuma logs.
+2. Nospiediet Alt+D vai uzklikšķiniet uz "BC atlaižu pārvaldnieks"
+   ikonas Edge rīkjoslā.
+3. Atvērsies priekšskatījuma logs (ekrānā nav traucējošu peldošu pogu).
 4. Nospiediet "⚡ Automātiski ierakstīt", un pārvaldnieks pats zibenīgi aizpildīs
    "Rindas atlaide %" laukus visām precēm!
 

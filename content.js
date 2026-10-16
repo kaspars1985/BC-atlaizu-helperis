@@ -12,7 +12,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.1.0";
+  const APP_VERSION = "2.1.1";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -207,9 +207,11 @@
         return true;
       }
 
-      // Pieprasījums atvērt modālo logu no pārlūka rīkjoslas popup
+      // Pieprasījums atvērt modālo logu no pārlūka rīkjoslas ikonas vai Alt+D
       if (request.action === "OPEN_DISCOUNT_MODAL") {
-        openDiscountManagerModal();
+        if (window === window.top) {
+          openDiscountManagerModal();
+        }
         sendResponse({ success: true });
         return true;
       }
@@ -250,14 +252,8 @@
 
   function checkAndInjectUI() {
     if (bcmBusy) return;
-    const isSalesOrderPage = detectSalesOrderPage();
+    removeSalesOrderLauncher();
     const isDiscountsPage = detectDiscountsPage();
-
-    if (isSalesOrderPage) {
-      injectSalesOrderLauncher();
-    } else {
-      removeSalesOrderLauncher();
-    }
 
     if (isDiscountsPage) {
       if (window === window.top) {
@@ -418,34 +414,8 @@
   }
 
   function injectSalesOrderLauncher() {
-    const targetDoc = (window.top && window.top.document) ? window.top.document : document;
-
-    if (targetDoc.getElementById("bcm-launcher-btn") || document.getElementById("bcm-launcher-btn")) {
-      updateLauncherBadge();
-      return;
-    }
-
-    const btn = targetDoc.createElement("div");
-    btn.id = "bcm-launcher-btn";
-    btn.className = "bcm-launcher-btn";
-    btn.innerHTML = `
-      <span class="bcm-launcher-icon">⚡</span>
-      <span>Piemērot atlaides</span>
-      <span style="font-size: 10px; opacity: 0.8; margin-left: 2px;">v${APP_VERSION}</span>
-      <span id="bcm-launcher-badge" class="bcm-launcher-client-badge">Meklē klientu...</span>
-    `;
-    btn.title = `BC atlaižu pārvaldnieks v${APP_VERSION}`;
-
-    btn.addEventListener("click", () => {
-      if (!isExtensionContextValid()) {
-        alert("Paplašinājums ir atjaunināts! Lūdzu, pārlādējiet šo lapu (nospiediet F5).");
-        return;
-      }
-      openDiscountManagerModal();
-    });
-
-    (targetDoc.body || document.body).appendChild(btn);
-    updateLauncherBadge();
+    // Poga pilnībā noņemta no BC lapas pēc lietotāja pieprasījuma
+    removeSalesOrderLauncher();
   }
 
   function removeSalesOrderLauncher() {
@@ -454,22 +424,7 @@
     if (existing) existing.remove();
   }
 
-  function updateLauncherBadge() {
-    const targetDoc = (window.top && window.top.document) ? window.top.document : document;
-    const badge = targetDoc.getElementById("bcm-launcher-badge") || document.getElementById("bcm-launcher-badge");
-    if (!badge) return;
-
-    const headerInfo = extractHeaderCustomerInfo();
-    if (headerInfo && headerInfo.relatedCustomerNo) {
-      badge.textContent = `${headerInfo.relatedCustomerNo}${headerInfo.relatedCustomerName ? " · " + headerInfo.relatedCustomerName : ""}`;
-      badge.title = `Saistītais klients: ${headerInfo.relatedCustomerNo} (${headerInfo.relatedCustomerName || "Nav nosaukuma"})`;
-      badge.style.background = "rgba(0,0,0,0.25)";
-    } else {
-      badge.textContent = "Nav norādīts saistītais klients";
-      badge.title = "Pasūtījumā nav aizpildīts lauks 'Saistītā klienta nr.'";
-      badge.style.background = "rgba(220,38,38,0.4)";
-    }
-  }
+  function updateLauncherBadge() {}
 
   // --------------------------------------------------------------------------
   // 3. Pasūtījuma galvenes datu nolasīšana
@@ -3454,6 +3409,15 @@
       toast.remove();
     }, 4500);
   }
+
+  window.addEventListener("keydown", (e) => {
+    if (e.altKey && (e.key === "d" || e.key === "D")) {
+      if (window === window.top) {
+        e.preventDefault();
+        openDiscountManagerModal();
+      }
+    }
+  });
 
   // Sākam inicializāciju
   if (document.readyState === "loading") {
