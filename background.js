@@ -1,11 +1,11 @@
 /**
- * BC Atlaižu Helperis - Background Service Worker
+ * BC atlaižu pārvaldnieks - Background Service Worker
  * Manifest V3
  */
 
 // Initialize default storage on installation
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[BC Atlaižu Helperis] Paplašinājums veiksmīgi uzstādīts!");
+  console.log("[BC atlaižu pārvaldnieks] Paplašinājums veiksmīgi uzstādīts!");
   
   chrome.storage.local.get(["bc_manager_settings", "bc_client_discounts"], (data) => {
     if (!data.bc_manager_settings) {
@@ -67,7 +67,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         });
       } catch (e) {
-        console.warn("[BC Atlaižu Helperis] Neizdevās saglabāt storage.session:", e);
+        console.warn("[BC atlaižu pārvaldnieks] Neizdevās saglabāt storage.session:", e);
       }
       sendResponse({ success: true, syncTabId: newTab.id });
     });
@@ -391,7 +391,7 @@ async function checkVersionUpdate(force = false) {
 
     return updateInfo;
   } catch (e) {
-    console.warn("[BC Atlaižu Helperis] Neizdevās pārbaudīt versiju:", e);
+    console.warn("[BC atlaižu pārvaldnieks] Neizdevās pārbaudīt versiju:", e);
     const stored = await chrome.storage.local.get(["bcm_update_info"]);
     return stored.bcm_update_info || { currentVersion: chrome.runtime.getManifest().version, hasUpdate: false, error: e.message };
   }
@@ -400,5 +400,14 @@ async function checkVersionUpdate(force = false) {
 // Automātiskā pārbaude pie pārlūka palaišanas
 chrome.runtime.onStartup.addListener(() => {
   checkVersionUpdate(false);
+});
+
+// Atver modālo logu aktīvajā cilnē uzklikšķinot uz rīkjoslas ikonas
+chrome.action.onClicked.addListener((tab) => {
+  if (tab && tab.id) {
+    chrome.tabs.sendMessage(tab.id, { action: "OPEN_DISCOUNT_MODAL" }, { frameId: 0 }, () => {
+      if (chrome.runtime.lastError) {}
+    });
+  }
 });
 

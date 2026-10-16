@@ -1,5 +1,5 @@
 /* ==========================================================================
-   BC Atlaižu Helperis - Stili (Styles)
+   BC atlaižu pārvaldnieks - Stili
    Pielāgots Microsoft Dynamics 365 Business Central un AM Furnitūra dizainam
    ========================================================================== */
 
@@ -36,7 +36,7 @@
   padding: 10px 18px;
   background: linear-gradient(135deg, #ff5501 0%, #e04b00 100%);
   color: #ffffff !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
   font-size: 13.5px;
   font-weight: 600;
   border-radius: 50px;
@@ -108,10 +108,15 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
   color: var(--bcm-text);
   border: 1px solid var(--bcm-border);
   animation: bcmScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bcm-modal-card,
+.bcm-modal-card * {
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
 }
 
 @keyframes bcmScaleUp {
@@ -149,6 +154,8 @@
 }
 
 .bcm-modal-title {
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
+  line-height: 1.25;
   font-size: 16.5px;
   font-weight: 700;
   color: var(--bcm-dark);
@@ -514,7 +521,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
   font-size: 13px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }

@@ -1,5 +1,5 @@
 ========================================================================
-BC ATLAIŽU HELPERIS (AM Furnitūra) - UZSTĀDĪŠANAS PAMĀCĪBA
+BC ATLAIŽU PĀRVALDNIEKS (AM Furnitūra) - UZSTĀDĪŠANAS PAMĀCĪBA
 ========================================================================
 
 Šis paplašinājums paredzēts darbam ar Microsoft Dynamics 365 Business Central
@@ -26,7 +26,7 @@ UZSTĀDĪŠANA MICROSOFT EDGE PĀRLŪKĀ (Aizņem 30 sekundes):
    C:\Users\KasparsCiematnieks\Desktop\ANTIGRAVITY\BC menedžera palīgs
 
 6. Edge rīkjoslā (pie puzles ikonas) uzklikšķiniet uz acs ikonas pie 
-   "BC atlaižu helperis", lai tā vienmēr būtu redzama.
+   "BC atlaižu pārvaldnieks", lai tā vienmēr būtu redzama.
 
 ------------------------------------------------------------------------
 KĀ LIETOT IKDIENĀ:
@@ -35,7 +35,7 @@ KĀ LIETOT IKDIENĀ:
 2. Ja pasūtījumā ir ievadīts "Saistītā klienta nr.", ekrāna apakšā pa labi
    parādīsies poga: "⚡ Piemērot atlaides".
 3. Uzklikšķiniet uz tās - atvērsies priekšskatījuma logs.
-4. Nospiediet "⚡ Automātiski ierakstīt", un helperis pats zibenīgi aizpildīs
+4. Nospiediet "⚡ Automātiski ierakstīt", un pārvaldnieks pats zibenīgi aizpildīs
    "Rindas atlaide %" laukus visām precēm!
 
 ------------------------------------------------------------------------
@@ -44,6 +44,6 @@ KĀ VIENREIZ IELASĪT KLIENTA ATLAIDES:
 1. Atveriet Business Central atlaižu lapu:
    https://amfbc.amf.lv:8443/AMF/?page=7004
 2. Atlasiet vajadzīgo klientu laukā "Pārdošanas kods".
-3. Lapas augšpusē nospiediet "💾 Saglabāt atlaides helperim".
+3. Lapas augšpusē nospiediet "💾 Saglabāt atlaides".
 4. Gatavs! Šī klienta atlaides turpmāk saglabāsies un darbosies automātiski.
 ========================================================================

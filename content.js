@@ -1,5 +1,5 @@
 /**
- * BC Atlaižu Helperis - Content Script
+ * BC atlaižu pārvaldnieks - Content Script
  * Manifest V3 - Integrācija ar Microsoft Dynamics 365 Business Central
  */
 
@@ -7,12 +7,12 @@
   if (window.__bcmManagerLoaded) return;
   window.__bcmManagerLoaded = true;
 
-  console.log("[BC Atlaižu Helperis] Sākotnējā ielāde Business Central lapā.");
+  console.log("[BC atlaižu pārvaldnieks] Sākotnējā ielāde Business Central lapā.");
 
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.0.0";
+  const APP_VERSION = "2.1.0";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -434,7 +434,7 @@
       <span style="font-size: 10px; opacity: 0.8; margin-left: 2px;">v${APP_VERSION}</span>
       <span id="bcm-launcher-badge" class="bcm-launcher-client-badge">Meklē klientu...</span>
     `;
-    btn.title = `BC Atlaižu Helperis v${APP_VERSION}`;
+    btn.title = `BC atlaižu pārvaldnieks v${APP_VERSION}`;
 
     btn.addEventListener("click", () => {
       if (!isExtensionContextValid()) {
@@ -554,6 +554,13 @@
           !combinedDesc.includes("saistīt") && !combinedDesc.includes("preces")
         ) {
           if (!info.customerNo && !/klienta|customer|nr\.?$/i.test(val) && val.length <= 25 && !isInsideFactBox(el)) info.customerNo = val;
+        }
+        // Pamatklienta nosaukums
+        else if (
+          (combinedDesc.includes("klienta nosauk") || combinedDesc.includes("sell-to customer name") || combinedDesc.includes("customer name")) &&
+          !combinedDesc.includes("saistīt") && !combinedDesc.includes("preces") && !combinedDesc.includes("meklē")
+        ) {
+          if (!info.customerName && !/klienta|customer|nosaukums|name$/i.test(val) && !isInsideFactBox(el)) info.customerName = val;
         }
         // Dokumenta datums
         else if (combinedDesc.includes("dokumenta datums") || combinedDesc.includes("document date")) {
@@ -1981,10 +1988,10 @@
               <div class="bcm-logo-icon">⚡</div>
               <div>
                 <h3 class="bcm-modal-title" style="display: flex; align-items: center; gap: 8px;">
-                  <span>BC Atlaižu Helperis <small style="font-weight:600;opacity:0.75;">v${APP_VERSION}</small> · Atlaižu Pārvaldnieks</span>
+                  <span>BC atlaižu pārvaldnieks <small style="font-weight:600;opacity:0.75;">v${APP_VERSION}</small></span>
                   ${updateInfo && updateInfo.hasUpdate ? `<a href="${updateInfo.releaseUrl}" target="_blank" style="text-decoration: none; font-size: 11px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 2px 7px; border-radius: 12px; font-weight: 600;">🚀 Pieejama v${escapeHtml(updateInfo.latestVersion)}</a>` : ""}
                 </h3>
-                <div class="bcm-modal-subtitle">Pasūtījums: ${headerInfo.orderNo || "Pārdošanas pasūtījums"} · AM Furnitūra</div>
+                <div class="bcm-modal-subtitle">Pasūtījums: ${escapeHtml(headerInfo.orderNo || "Pārdošanas pasūtījums")}${headerInfo.customerName ? " · " + escapeHtml(headerInfo.customerName) : ""}</div>
               </div>
             </div>
             <button class="bcm-close-btn" id="bcm-modal-close" title="Aizvērt logu">✕</button>
@@ -2176,6 +2183,21 @@
 
       const bindDiscountInputs = () => {
         modal.querySelectorAll(".bcm-discount-input").forEach(input => {
+          input.addEventListener("focus", (e) => {
+            const raw = e.target.value.trim();
+            if (raw === "0" || parseFloat(raw) === 0) {
+              e.target.value = "";
+            } else {
+              e.target.select();
+            }
+          });
+          input.addEventListener("blur", (e) => {
+            if (e.target.value.trim() === "") {
+              const idx = parseInt(e.target.dataset.idx, 10);
+              const cur = (lines[idx] && lines[idx].newDiscount) ? lines[idx].newDiscount : 0;
+              e.target.value = String(cur);
+            }
+          });
           input.addEventListener("input", (e) => {
             const idx = parseInt(e.target.dataset.idx, 10);
             const val = parseFloat(e.target.value) || 0;
@@ -2742,7 +2764,7 @@
             remainingLines = linesToUpdate.filter(l => failedSet.has(l.id));
           }
         } catch (err) {
-          console.warn("[BC Atlaižu Helperis] OData apply kļūda, pārejam uz DOM ievadi:", err);
+          console.warn("[BC atlaižu pārvaldnieks] OData apply kļūda, pārejam uz DOM ievadi:", err);
         }
       }
 
@@ -2988,10 +3010,10 @@
     banner.innerHTML = `
       <div class="bcm-page7004-info">
         <span style="font-size: 16px;">⚡</span>
-        <span id="bcm-page7004-status-text"><strong>BC Atlaižu Helperis (v${APP_VERSION}):</strong> Gatavs nolasīt un saglabāt klienta rindu atlaides kešā.</span>
+        <span id="bcm-page7004-status-text"><strong>BC atlaižu pārvaldnieks (v${APP_VERSION}):</strong> Gatavs nolasīt un saglabāt klienta rindu atlaides kešā.</span>
       </div>
       <div id="bcm-page7004-actions" style="display: flex; align-items: center; gap: 8px;">
-        <button class="bcm-page7004-btn" id="bcm-scrape-7004-btn">💾 Saglabāt atlaides helperim</button>
+        <button class="bcm-page7004-btn" id="bcm-scrape-7004-btn">💾 Saglabāt atlaides</button>
       </div>
     `;
 
@@ -3032,7 +3054,7 @@
 
     if (!session || !session.isSyncTab) {
       bcmLog("PAGE7004_OPENED_MANUALLY");
-      setBanner("info", `<strong>BC Atlaižu Helperis (v${APP_VERSION}):</strong> Lapa atvērta manuāli. Nofiltrējiet klientu un spiediet <em>'💾 Saglabāt atlaides helperim'</em>.`);
+      setBanner("info", `<strong>BC atlaižu pārvaldnieks (v${APP_VERSION}):</strong> Lapa atvērta manuāli. Nofiltrējiet klientu un spiediet <em>'💾 Saglabāt atlaides'</em>.`);
       return; // K5: NEKAD neautomatizē un neaizver cilni, ko lietotājs atvēra pats
     }
 
@@ -3237,7 +3259,7 @@
 
   function failKeepOpen(msg) {
     bcmLog("SYNC_FAILED_KEEP_OPEN", { message: msg });
-    setBanner("warning", `⚠️ <strong>BC Atlaižu Helperis:</strong> ${escapeHtml(msg)}`, true);
+    setBanner("warning", `⚠️ <strong>BC atlaižu pārvaldnieks:</strong> ${escapeHtml(msg)}`, true);
     showToast(`⚠️ ${msg}`, "warning");
 
     const actionsBox = document.getElementById("bcm-page7004-actions");
@@ -3344,8 +3366,8 @@
       if (autoCloseCancelled) return;
       if (statusEl) {
         statusEl.innerHTML = count > 0
-          ? `✅ <strong>BC Atlaižu Helperis:</strong> Saglabātas <strong>${count}</strong> atlaides klientam <strong>${customerNo}</strong>! Cilne aizvērsies pēc <strong>${remaining}s</strong>...`
-          : `ℹ️ <strong>BC Atlaižu Helperis:</strong> Klientam <strong>${customerNo}</strong> Business Central nav individuālu atlaižu (0%). Saglabāts. Cilne aizvērsies pēc <strong>${remaining}s</strong>...`;
+          ? `✅ <strong>BC atlaižu pārvaldnieks:</strong> Saglabātas <strong>${count}</strong> atlaides klientam <strong>${customerNo}</strong>! Cilne aizvērsies pēc <strong>${remaining}s</strong>...`
+          : `ℹ️ <strong>BC atlaižu pārvaldnieks:</strong> Klientam <strong>${customerNo}</strong> Business Central nav individuālu atlaižu (0%). Saglabāts. Cilne aizvērsies pēc <strong>${remaining}s</strong>...`;
       }
 
       if (actionsEl && !document.getElementById("bcm-cancel-close-btn")) {
@@ -3358,7 +3380,7 @@
           autoCloseCancelled = true;
           clearTimeout(autoCloseTimer);
           if (statusEl) {
-            statusEl.innerHTML = `✓ <strong>BC Atlaižu Helperis:</strong> Dati saglabāti kešā. Cilne paliek atvērta pārskatīšanai.`;
+            statusEl.innerHTML = `✓ <strong>BC atlaižu pārvaldnieks:</strong> Dati saglabāti kešā. Cilne paliek atvērta pārskatīšanai.`;
           }
           if (actionsEl) {
             actionsEl.innerHTML = `<button class="bcm-page7004-btn" id="bcm-close-now-btn">Aizvērt cilni</button>`;
