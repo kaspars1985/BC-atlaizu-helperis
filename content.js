@@ -12,7 +12,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.1.1";
+  const APP_VERSION = "2.2.0";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -444,14 +444,14 @@
     if (bcDoc && bcDoc !== document) docs.push(bcDoc);
 
     for (const d of docs) {
-      const titleMatch = ((d.title || "") + " " + (document.title || "")).match(/PPAS\d+/i);
-      if (titleMatch && !info.orderNo) info.orderNo = titleMatch[0].toUpperCase();
+      const titleMatch = ((d.title || "") + " " + (document.title || "")).match(/\b((?:PPAS|AV)[0-9]+)\b/i);
+      if (titleMatch && !info.orderNo) info.orderNo = titleMatch[1].toUpperCase();
 
       if (!info.orderNo) {
         const headings = Array.from(d.querySelectorAll('.ms-nav-layout-head-caption, [role="heading"]'));
         for (const h of headings) {
           const txt = (h.innerText || h.textContent || "").trim();
-          const m = txt.match(/[∙•\-]\s*([A-Za-z0-9_-]+)/) || txt.match(/\b((?:PPAS|AV)[0-9]+)\b/i);
+          const m = txt.match(/\b((?:PPAS|AV)[0-9]+)\b/i) || txt.match(/[∙•]\s*([A-Za-z0-9_-]*\d[A-Za-z0-9_-]*)/);
           if (m && m[1]) {
             info.orderNo = m[1].toUpperCase();
             break;
@@ -467,8 +467,8 @@
           if (isInsideFactBox(nc)) continue;
           const inp = nc.querySelector("input, .ms-nav-edit-control") || nc;
           const val = (inp.value || inp.innerText || "").trim();
-          if (val && !/nr\.?$/i.test(val) && val.length >= 3 && val.length <= 25) {
-            info.orderNo = val;
+          if (val && !/nr\.?$/i.test(val) && /\d/.test(val) && val.length >= 3 && val.length <= 25) {
+            info.orderNo = val.toUpperCase();
             break;
           }
         }
@@ -1877,6 +1877,9 @@
       }
 
       let lines = await matchDiscountsForLines(rawLines, headerInfo.relatedCustomerNo);
+      lines.odataLoaded = rawLines.odataLoaded;
+      lines.hasDiscountColumn = rawLines.hasDiscountColumn;
+      lines.hasGroupColumn = rawLines.hasGroupColumn;
       let updateInfo = null;
       try {
         const stored = await chrome.storage.local.get(["bcm_update_info"]);
@@ -2190,46 +2193,8 @@
       const bindScanAllBtn = () => {
         const scanAllBtn = modal.querySelector("#bcm-scan-all-lines-btn");
         if (!scanAllBtn) return;
-        scanAllBtn.addEventListener("click", async () => {
-          scanAllBtn.disabled = true;
-          scanAllBtn.textContent = "⏳ Ritinām pasūtījumu...";
-          const progressBox = modal.querySelector("#bcm-progress-box");
-          const progressText = modal.querySelector("#bcm-progress-text");
-          const progressBar = modal.querySelector("#bcm-progress-bar");
-          if (progressBox) progressBox.style.display = "block";
-          if (progressText) progressText.textContent = "Ritinām pasūtījumu un meklējam papildu rindas...";
-          if (progressBar) progressBar.style.width = "40%";
-
-          try {
-            const allExtracted = await extractAllSalesLines((count) => {
-              if (progressText) progressText.textContent = `Ritinām pasūtījumu... atrasta(s) ${count} rindas`;
-              if (progressBar) progressBar.style.width = `${Math.min(95, 40 + count * 2)}%`;
-            }, knownGroupCodes);
-            const matchedAll = await matchDiscountsForLines(allExtracted, headerInfo.relatedCustomerNo);
-            lines.length = 0;
-            lines.push(...matchedAll);
-            // Pārkopējam kolonnu esamības karodziņus no pilnās skenēšanas
-            lines.hasDiscountColumn = allExtracted.hasDiscountColumn;
-            lines.hasGroupColumn = allExtracted.hasGroupColumn;
-            const tbody = modal.querySelector("#bcm-table-body");
-            if (tbody) {
-              tbody.innerHTML = renderTableRows(lines);
-              bindDiscountInputs();
-              attachReloadListener();
-            }
-            updateModalSummaryAndButton();
-            updateColumnWarnings(lines, true);
-            if (progressText) progressText.textContent = `✓ Veiksmīgi ielasītas visas ${lines.length} rindas!`;
-            if (progressBar) progressBar.style.width = "100%";
-            setTimeout(() => { if (progressBox) progressBox.style.display = "none"; }, 1200);
-            showToast(`✓ Ielasītas visas ${lines.length} pasūtījuma rindas!`, "success");
-          } catch (e) {
-            console.warn("Kļūda skenējot visas rindas:", e);
-            if (progressBox) progressBox.style.display = "none";
-          } finally {
-            scanAllBtn.disabled = false;
-            scanAllBtn.innerHTML = "<span>🔍</span> Ielasīt visas rindas (ritināt)";
-          }
+        scanAllBtn.addEventListener("click", () => {
+          openDiscountManagerModal(headerInfo.relatedCustomerNo);
         });
       };
       bindScanAllBtn();
@@ -2254,28 +2219,6 @@
       modal.querySelector("#bcm-apply-btn").addEventListener("click", async () => {
         await executeApplyDiscounts(lines);
       });
-
-      // Fona papildu rindu pārbaude (ja tabula ir ritināma 2D virzienā, nebloķējot lietotāju)
-      setTimeout(() => {
-        if (rawLines.odataLoaded || lines.odataLoaded) {
-          updateColumnWarnings(lines, true);
-          return;
-        }
-        const anchor = (lines[0] && lines[0].gridElement) || findSalesLinesListPart(getBCDocument());
-        const vScroller = anchor ? findScroller(anchor) : null;
-        const hScroller = anchor ? findHorizontalScroller(anchor) : null;
-        const hasGroupRules = knownGroupCodes.size > 0;
-        const needsVertScan = !!(vScroller && vScroller.scrollHeight > vScroller.clientHeight + 40);
-        const needsHorizScan = !!(hScroller && hScroller.scrollWidth > hScroller.clientWidth + 20 && (!lines.hasDiscountColumn || (hasGroupRules && !lines.hasGroupColumn)));
-        if (needsVertScan || needsHorizScan) {
-          const scanBtn = modal.querySelector("#bcm-scan-all-lines-btn");
-          if (scanBtn && !scanBtn.disabled) {
-            scanBtn.click();
-          }
-        } else {
-          updateColumnWarnings(lines, true);
-        }
-      }, 120);
 
     } catch (err) {
       console.error("[BC Atlaižu Helperis] Kļūda atverot modālo logu:", err);
@@ -2531,100 +2474,7 @@
     el.dispatchEvent(new KeyboardEvent("keyup", opts));
   }
 
-  // Ieraksta atlaidi vienā rindā ar precīzu BC cikla sinhronizāciju pirmajā piegājienā
-  async function writeDiscountForLine(line, bcDoc) {
-    const valStr = formatBcNumber(line.newDiscount, bcDoc);
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      let row = findRowNow(line, bcDoc) || await resolveRow(line, bcDoc);
-      if (!row) {
-        bcmLog("WRITE_ROW_NOT_FOUND", { item: line.itemCode, ordinal: line.ordinal, attempt });
-        continue;
-      }
-
-      // Nodrošinām, ka atlaides šūna ir redzama (horizontālā virtualizācija)
-      let cell = getDiscountCellForRow(row, line, bcDoc) || await ensureDiscountCellVisible(row, line, bcDoc);
-      if (!cell) {
-        bcmLog("WRITE_CELL_NOT_FOUND", { item: line.itemCode, attempt, ariaIdx: line.discountAriaColIndex, colIdx: line.discountColIndex });
-        continue;
-      }
-
-      // Ja ritināšanas laikā rinda tika pārzīmēta, atkārtoti to atrodam
-      if (!row.isConnected) {
-        row = findRowNow(line, bcDoc) || row;
-      }
-      if (!cell.isConnected) {
-        cell = getDiscountCellForRow(row, line, bcDoc) || cell;
-      }
-
-      const currentVal = readCellValue(cell);
-      if (currentVal !== null && Math.abs(currentVal - line.newDiscount) < 0.05) {
-        ensureHighlightStyles(cell.ownerDocument || document);
-        highlightCell(cell);
-        return { ok: true, cell };
-      }
-
-      const doc = cell.ownerDocument || document;
-      ensureHighlightStyles(doc);
-      const rect = cell.getBoundingClientRect();
-      const win = doc.defaultView || window;
-      if (rect.top < 0 || rect.bottom > win.innerHeight || rect.left < 0 || rect.right > win.innerWidth) {
-        cell.scrollIntoView({ behavior: "instant", block: "nearest", inline: "nearest" });
-        await nextFrame();
-      }
-      highlightCell(cell);
-
-      let inp = cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null);
-      if (!inp) {
-        clickAt(cell);
-        inp = await waitFor(() => cell.isConnected && (cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null)), 400, 15);
-      }
-      if (!inp) {
-        const inner = cell.firstElementChild || cell;
-        clickAt(inner);
-        try {
-          inner.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true, view: doc.defaultView }));
-        } catch (e) {}
-        inp = await waitFor(() => cell.isConnected && (cell.querySelector("input") || (doc.activeElement && doc.activeElement.tagName === "INPUT" && cell.contains(doc.activeElement) ? doc.activeElement : null)), 400, 15);
-      }
-      if (!inp) {
-        bcmLog("WRITE_NO_INPUT", { item: line.itemCode, attempt });
-        continue;
-      }
-
-      // Ļaujam BC pabeigt fokusa/izlases inicializāciju jaunajā input laukā (~25ms), lai BC nepārraksta mūsu vērtību ar 0,00
-      await sleep(25);
-
-      try {
-        inp.focus();
-        inp.select();
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-        setter.call(inp, valStr);
-        inp.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
-        inp.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
-        sendKey(inp, "Tab", 9);
-        inp.blur();
-      } catch (e) {
-        bcmLog("WRITE_ERROR", { item: line.itemCode, error: String(e) });
-        continue;
-      }
-
-      const target = line.newDiscount;
-      const verified = await waitFor(() => {
-        const r = findRowNow(line, bcDoc);
-        const c = r && getDiscountCellForRow(r, line, bcDoc);
-        if (!c) return null;
-        if (c.querySelector("input")) return null; // Gaidām, kamēr BC aizver input un saglabā vērtību šūnā
-        const val = readCellValue(c);
-        return Math.abs(val - target) < 0.05 ? c : null;
-      }, 800, 15);
-
-      if (verified) return { ok: true, cell: verified };
-      bcmLog("WRITE_VERIFY_FAILED", { item: line.itemCode, attempt, target, readVal: readCellValue(cell) });
-    }
-    return { ok: false, cell: null };
-  }
   async function writeDiscountToCell(cell, discountValue) {
-    // Saderībai ar veco API — izmanto tikai highlightTargetCell
     if (!cell) return false;
     ensureHighlightStyles(cell.ownerDocument || document);
     highlightCell(cell);
@@ -2645,7 +2495,6 @@
       return;
     }
 
-    // Rezerves nolūkam iekopējam VISAS rindas buferī (lai ielīmēšana sakristu 1:1)
     try {
       const bcDocClip = getBCDocument();
       const discountsText = lines.map(l => formatBcNumber(l.newDiscount, bcDocClip)).join("\r\n");
@@ -2659,105 +2508,82 @@
       const bcDoc = getBCDocument();
       const touchedCells = [];
 
-      // 1. Mēģinām momentālo OData API ierakstīšanu
+      // Atbrīvojam aktīvo šūnu BC tabulā, lai BC klients neturētu rindas bloķējumu (lock) uz servera
+      try {
+        if (bcDoc && bcDoc.activeElement && bcDoc.activeElement !== bcDoc.body) {
+          bcDoc.activeElement.blur();
+        }
+      } catch (e) {}
+
       const headerInfo = extractHeaderCustomerInfo();
       const orderNo = (lines[0] && lines[0].documentNumber) || headerInfo.orderNo;
-      let remainingLines = linesToUpdate;
 
-      if (orderNo) {
-        showToast(`⚡ Momentāli ieraksta atlaides serverī (${total} rindās)...`, "info");
-        try {
-          const odataRes = await chrome.runtime.sendMessage({
-            action: "ODATA_APPLY_DISCOUNTS",
-            orderNo,
-            updates: linesToUpdate.map(l => ({
-              id: l.id,
-              itemCode: l.itemCode,
-              ordinal: l.ordinal || 0,
-              newDiscount: l.newDiscount,
-              lineNumber: l.lineNumber,
-              documentType: l.documentType,
-              documentNumber: l.documentNumber
-            }))
-          });
+      if (!orderNo) {
+        showToast("⚠️ Neizdevās noteikt pasūtījuma numuru OData pieprasījumam!", "error");
+        return;
+      }
 
-          if (odataRes && odataRes.success) {
-            const failedSet = new Set(odataRes.failedIds || []);
-            const succeededLines = linesToUpdate.filter(l => !failedSet.has(l.id));
+      showToast(`⚡ Momentāli ieraksta atlaides serverī (${total} rindās)...`, "info");
 
-            for (const l of succeededLines) {
-              const r = findRowNow(l, bcDoc);
-              const c = r && getDiscountCellForRow(r, l, bcDoc);
-              if (c) {
-                ensureHighlightStyles(c.ownerDocument || bcDoc);
-                highlightCell(c);
-                touchedCells.push(c);
-                const txtVal = formatBcNumber(l.newDiscount, bcDoc);
-                if (!c.querySelector("input")) {
-                  const targetEl = c.querySelector(".stringcontrol-read, span") || c;
-                  if (targetEl) targetEl.textContent = txtVal;
-                }
-              }
-            }
+      const odataRes = await chrome.runtime.sendMessage({
+        action: "ODATA_APPLY_DISCOUNTS",
+        orderNo,
+        updates: linesToUpdate.map(l => ({
+          id: l.id,
+          itemCode: l.itemCode,
+          ordinal: l.ordinal || 0,
+          newDiscount: l.newDiscount,
+          lineNumber: l.lineNumber,
+          documentType: l.documentType,
+          documentNumber: l.documentNumber
+        }))
+      });
 
-            try {
-              sendKey(bcDoc.activeElement || bcDoc.body, "F5", 116);
-            } catch (e) {}
+      if (!odataRes || !odataRes.success) {
+        showToast(`⚠️ OData kļūda: ${(odataRes && odataRes.error) || "Neizdevās savienoties ar serveri"}`, "error");
+        return;
+      }
 
-            if (!odataRes.failedIds || odataRes.failedIds.length === 0) {
-              setTimeout(() => touchedCells.forEach(clearCellHighlight), 1000);
-              const onAnyClick = () => {
-                touchedCells.forEach(clearCellHighlight);
-                clearAllHighlights();
-                window.removeEventListener("click", onAnyClick, true);
-              };
-              window.addEventListener("click", onAnyClick, true);
-              showToast(`✅ Momentāli ierakstītas atlaides ${odataRes.updatedCount} no ${total} rindām!`, "success");
-              return;
-            }
+      const failedSet = new Set(odataRes.failedIds || []);
+      const succeededLines = linesToUpdate.filter(l => !failedSet.has(l.id));
 
-            remainingLines = linesToUpdate.filter(l => failedSet.has(l.id));
+      for (const l of succeededLines) {
+        const r = findRowNow(l, bcDoc);
+        const c = r && getDiscountCellForRow(r, l, bcDoc);
+        if (c) {
+          ensureHighlightStyles(c.ownerDocument || bcDoc);
+          highlightCell(c);
+          touchedCells.push(c);
+          const txtVal = formatBcNumber(l.newDiscount, bcDoc);
+          if (!c.querySelector("input")) {
+            const targetEl = c.querySelector(".stringcontrol-read, span") || c;
+            if (targetEl) targetEl.textContent = txtVal;
           }
-        } catch (err) {
-          console.warn("[BC atlaižu pārvaldnieks] OData apply kļūda, pārejam uz DOM ievadi:", err);
         }
       }
 
-      // 2. DOM fallback ierakstīšana neizdevušajām vai visām rindām
-      resetGridSelection(bcDoc);
-      await nextFrame();
-
-      showToast(`⚡ Automātiski ieraksta atlaides ${remainingLines.length} rindās...`, "info");
-
-      const failed = [];
-      let successCount = total - remainingLines.length;
-      for (const line of remainingLines) {
-        const res = await writeDiscountForLine(line, bcDoc);
-        if (res.ok) {
-          successCount++;
-          if (res.cell) touchedCells.push(res.cell);
-        } else {
-          failed.push(line);
-        }
-      }
+      try {
+        sendKey(bcDoc.activeElement || bcDoc.body, "F5", 116);
+      } catch (e) {}
 
       setTimeout(() => touchedCells.forEach(clearCellHighlight), 1000);
-
-      if (failed.length === 0) {
-        clearAllHighlights();
-        showToast(`✅ Veiksmīgi ierakstītas atlaides ${successCount} no ${total} rindām!`, "success");
-      } else {
-        const list = failed.map(l => `${l.rowIndex} (${l.itemCode})`).join(", ");
-        bcmLog("APPLY_PARTIAL", { successCount, total, failed: failed.map(l => l.itemCode) });
-        showToast(`⚠️ Ierakstītas ${successCount}/${total}. Neizdevās rindām: ${list}. Pārbaudiet tās manuāli.`, "warning");
-      }
-
       const onAnyClick = () => {
         touchedCells.forEach(clearCellHighlight);
         clearAllHighlights();
         window.removeEventListener("click", onAnyClick, true);
       };
       window.addEventListener("click", onAnyClick, true);
+
+      if (!odataRes.failedIds || odataRes.failedIds.length === 0) {
+        showToast(`✅ Momentāli ierakstītas atlaides ${odataRes.updatedCount} no ${total} rindām!`, "success");
+      } else {
+        const failedLines = linesToUpdate.filter(l => failedSet.has(l.id));
+        const list = failedLines.map(l => `${l.rowIndex} (${l.itemCode})`).join(", ");
+        showToast(`⚠️ Momentāli ierakstītas ${odataRes.updatedCount}/${total}. Serveris nepieņēma rindas: ${list} (pārbaudiet, vai rindā nav kļūdas).`, "warning");
+      }
+    } catch (err) {
+      console.error("[BC atlaižu pārvaldnieks] OData apply kļūda:", err);
+      showToast(`⚠️ Kļūda ierakstot atlaides: ${err.message || err}`, "error");
     } finally {
       bcmBusy = false;
     }

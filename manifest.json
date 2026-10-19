@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BC atlaižu pārvaldnieks",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Vieds palīgs AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Business Central.",
   "permissions": [
     "storage",
@@ -12,6 +12,8 @@
   "host_permissions": [
     "*://amfbc.amf.lv/*",
     "*://*.amf.lv/*",
+    "https://amfbc.amf.lv:7048/*",
+    "https://amfbc.amf.lv:8443/*",
     "https://api.github.com/*"
   ],
   "background": {

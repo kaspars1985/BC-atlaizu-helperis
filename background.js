@@ -171,22 +171,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return "AM Furnitūra EUR";
   }
 
-  async function fetchODataWithAuth(url, options = {}) {
-    let res = await fetch(url, { credentials: "include", ...options });
-    if (res.status === 401) {
-      try {
-        const authTab = await chrome.tabs.create({
-          url: "https://amfbc.amf.lv:7048/AMF/ODataV4/Company('AM%20Furnit%C5%ABra%20EUR')/salesDocumentLines?$top=1",
-          active: false
-        });
-        await new Promise(r => setTimeout(r, 1500));
-        if (authTab && authTab.id) {
-          try { await chrome.tabs.remove(authTab.id); } catch (e) {}
+  async function warmUpODataAuth() {
+    try {
+      const authUrl = "https://amfbc.amf.lv:7048/AMF/ODataV4/Company('AM%20Furnit%C5%ABra%20EUR')/salesDocumentLines?$top=1";
+      const authTab = await chrome.tabs.create({ url: authUrl, active: false });
+      await new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }, 3500);
+        function listener(tabId, info) {
+          if (tabId === authTab.id && info.status === "complete") {
+            clearTimeout(timer);
+            chrome.tabs.onUpdated.removeListener(listener);
+            setTimeout(resolve, 250);
+          }
         }
-        res = await fetch(url, { credentials: "include", ...options });
-      } catch (e) {
-        console.warn("[BC Helper BG] Auth tab retry failed:", e);
+        chrome.tabs.onUpdated.addListener(listener);
+      });
+      if (authTab && authTab.id) {
+        try { await chrome.tabs.remove(authTab.id); } catch (e) {}
       }
+    } catch (e) {
+      console.warn("[BC atlaižu pārvaldnieks] Auth warmup kļūda:", e);
+    }
+  }
+
+  async function fetchODataWithAuth(url, options = {}) {
+    let res;
+    try {
+      res = await fetch(url, { credentials: "include", ...options });
+    } catch (netErr) {
+      await warmUpODataAuth();
+      res = await fetch(url, { credentials: "include", ...options });
+    }
+    if (res.status === 401 || res.status === 403) {
+      await warmUpODataAuth();
+      res = await fetch(url, { credentials: "include", ...options });
     }
     return res;
   }
@@ -247,6 +268,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // 2. solis: Katram u no updates
         let updatedCount = 0;
         const failedIds = [];
+        const usedLineNumbers = new Set();
 
         for (const u of updates) {
           let targetRow = null;
@@ -259,8 +281,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .filter(r => r.type === "Item" && String(r.number || "").trim().toUpperCase() === code)
               .sort((a, b) => (Number(a.lineNumber) || 0) - (Number(b.lineNumber) || 0));
             const ordIdx = Number(u.ordinal) || 0;
-            targetRow = matchedRows[ordIdx] || matchedRows[0] || null;
+            targetRow = matchedRows[ordIdx] || matchedRows.find(r => !usedLineNumbers.has(r.lineNumber)) || matchedRows[0] || null;
           }
+          if (targetRow) usedLineNumbers.add(targetRow.lineNumber);
 
           if (!targetRow) {
             failedIds.push(u.id);
@@ -284,9 +307,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           };
 
           let patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
-          if (!patchRes.ok && [409, 412, 500].includes(patchRes.status)) {
-            await new Promise(r => setTimeout(r, 40));
-            patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
+          if (!patchRes.ok && [409, 412, 500, 503].includes(patchRes.status)) {
+            for (const waitMs of [80, 180, 350]) {
+              if (patchRes.ok) break;
+              await new Promise(r => setTimeout(r, waitMs));
+              patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
+            }
           }
 
           if (patchRes.ok) {
