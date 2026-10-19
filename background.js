@@ -24,53 +24,84 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+function parseBcEnvFromUrl(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const pathParts = u.pathname.split("/").filter(Boolean);
+    const instance = pathParts[0] || "BC";
+    const company = u.searchParams.get("company") ? decodeURIComponent(u.searchParams.get("company")) : "";
+    return {
+      protocol: u.protocol || "https:",
+      hostname: u.hostname,
+      port: u.port || "8443",
+      instance,
+      company
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function resolveBcEnv(senderUrl, reqCompany) {
+  const parsed = parseBcEnvFromUrl(senderUrl);
+  const stored = await chrome.storage.local.get(["bc_env_config"]);
+  const prev = stored.bc_env_config || {};
+  const env = {
+    protocol: (parsed && parsed.protocol) || prev.protocol || "https:",
+    hostname: (parsed && parsed.hostname) || prev.hostname || "",
+    port: (parsed && parsed.port) || prev.port || "8443",
+    instance: (parsed && parsed.instance) || prev.instance || "BC",
+    company: reqCompany || (parsed && parsed.company) || prev.company || ""
+  };
+  if (env.hostname && env.company) {
+    await chrome.storage.local.set({ bc_env_config: env });
+  }
+  return env;
+}
+
 // Message Listener for coordination between content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Get active BC tabs
   if (request.action === "GET_ACTIVE_BC_TABS") {
-    chrome.tabs.query({ url: "*://amfbc.amf.lv/*" }, (tabs) => {
-      sendResponse({ success: true, tabs: tabs || [] });
+    chrome.tabs.query({}, (tabs) => {
+      const bcTabs = (tabs || []).filter(t => (t.url || "").includes(":8443") || (t.url || "").includes("page="));
+      sendResponse({ success: true, tabs: bcTabs });
     });
     return true;
   }
 
   // Sākt automātisku klienta atlaižu sinhronizāciju no Page 7004
   if (request.action === "START_CUSTOMER_SYNC") {
-    const customerNo = String(request.customerNo || "").trim().toUpperCase();
-    const originTabId = sender.tab ? sender.tab.id : null;
+    (async () => {
+      const customerNo = String(request.customerNo || "").trim().toUpperCase();
+      const originTabId = sender.tab ? sender.tab.id : null;
 
-    if (!customerNo) {
-      sendResponse({ success: false, error: "NO_CUSTOMER" });
-      return true;
-    }
-
-    // Nolasām company no origin tab URL, ja iespējams
-    let companyParam = "company=AM%20Furnit%C5%ABra%20EUR";
-    if (sender.tab && sender.tab.url) {
-      const compMatch = sender.tab.url.match(/company=([^&]+)/i);
-      if (compMatch) {
-        companyParam = `company=${compMatch[1]}`;
+      if (!customerNo) {
+        sendResponse({ success: false, error: "NO_CUSTOMER" });
+        return;
       }
-    }
 
-    const filterEncoded = encodeURIComponent(`'Sales Code' IS '${customerNo}'`);
-    const targetUrl = `https://amfbc.amf.lv:8443/AMF/?${companyParam}&page=7004&filter=${filterEncoded}`;
+      const env = await resolveBcEnv(sender.tab?.url, request.company);
+      const filterEncoded = encodeURIComponent(`'Sales Code' IS '${customerNo}'`);
+      const targetUrl = `${env.protocol}//${env.hostname}:${env.port}/${env.instance}/?company=${encodeURIComponent(env.company)}&page=7004&filter=${filterEncoded}`;
 
-    chrome.tabs.create({ url: targetUrl, active: true }, async (newTab) => {
-      try {
-        await chrome.storage.session.set({
-          bcm_sync_session: {
-            syncTabId: newTab.id,
-            originTabId: originTabId,
-            customerNo: customerNo,
-            startedAt: Date.now()
-          }
-        });
-      } catch (e) {
-        console.warn("[BC atlaižu pārvaldnieks] Neizdevās saglabāt storage.session:", e);
-      }
-      sendResponse({ success: true, syncTabId: newTab.id });
-    });
+      chrome.tabs.create({ url: targetUrl, active: true }, async (newTab) => {
+        try {
+          await chrome.storage.session.set({
+            bcm_sync_session: {
+              syncTabId: newTab.id,
+              originTabId: originTabId,
+              customerNo: customerNo,
+              startedAt: Date.now()
+            }
+          });
+        } catch (e) {
+          console.warn("[BC atlaižu pārvaldnieks] Neizdevās saglabāt storage.session:", e);
+        }
+        sendResponse({ success: true, syncTabId: newTab.id });
+      });
+    })();
     return true;
   }
 
@@ -117,9 +148,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           });
         });
       } else {
-        chrome.tabs.query({ url: "*://amfbc.amf.lv/*" }, (tabs) => {
-          if (tabs && tabs.length > 0) {
-            const orderTab = tabs.find(t => (t.url || "").includes("page=42") || (t.title || "").toLowerCase().includes("pasūtījums")) || tabs[0];
+        chrome.tabs.query({}, (tabs) => {
+          const bcTabs = (tabs || []).filter(t => (t.url || "").includes(":8443") || (t.url || "").includes("page="));
+          if (bcTabs.length > 0) {
+            const orderTab = bcTabs.find(t => (t.url || "").includes("page=42") || (t.title || "").toLowerCase().includes("pasūtījums")) || bcTabs[0];
             chrome.tabs.update(orderTab.id, { active: true }, () => {
               chrome.tabs.sendMessage(orderTab.id, {
                 action: "CUSTOMER_SYNC_COMPLETED",
@@ -142,13 +174,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Open Page 7004 in a background or helper tab (manuāli)
   if (request.action === "OPEN_BC_DISCOUNTS_PAGE") {
-    const customerNo = request.customerNo ? String(request.customerNo).trim().toUpperCase() : "";
-    const filterParam = customerNo ? `&filter=${encodeURIComponent(`'Sales Code' IS '${customerNo}'`)}` : "";
-    const url = `https://amfbc.amf.lv:8443/AMF/?company=AM%20Furnit%C5%ABra%20EUR&page=7004${filterParam}`;
+    (async () => {
+      const env = await resolveBcEnv(sender.tab?.url, request.company);
+      const customerNo = request.customerNo ? String(request.customerNo).trim().toUpperCase() : "";
+      const filterParam = customerNo ? `&filter=${encodeURIComponent(`'Sales Code' IS '${customerNo}'`)}` : "";
+      const url = `${env.protocol}//${env.hostname}:${env.port}/${env.instance}/?company=${encodeURIComponent(env.company)}&page=7004${filterParam}`;
 
-    chrome.tabs.create({ url: url, active: true }, (newTab) => {
-      sendResponse({ success: true, tabId: newTab.id });
-    });
+      chrome.tabs.create({ url: url, active: true }, (newTab) => {
+        sendResponse({ success: true, tabId: newTab.id });
+      });
+    })();
     return true;
   }
 
@@ -158,17 +193,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
     });
     return true;
-  }
-
-  // ODataV4 palīgfunkcijas
-  function getCompanyFromUrl(url) {
-    if (!url) return "AM Furnitūra EUR";
-    try {
-      const parsed = new URL(url);
-      const comp = parsed.searchParams.get("company");
-      if (comp) return decodeURIComponent(comp);
-    } catch (e) {}
-    return "AM Furnitūra EUR";
   }
 
   // Saglabāt OData akreditācijas datus
@@ -188,13 +212,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "ODATA_GET_ORDER_LINES") {
     (async () => {
       try {
-        const company = request.company || getCompanyFromUrl(sender.tab?.url);
+        const env = await resolveBcEnv(sender.tab?.url, request.company);
         const orderNo = String(request.orderNo || "").trim();
         if (!orderNo) {
           sendResponse({ success: false, error: "NO_ORDER_NO" });
           return;
         }
-        const odataUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
+        const odataUrl = `https://${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
         const res = await fetch(odataUrl, {
           method: "GET",
           credentials: "include",
@@ -222,7 +246,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "ODATA_APPLY_DISCOUNTS") {
     (async () => {
       try {
-        const company = request.company || getCompanyFromUrl(sender.tab?.url);
+        const env = await resolveBcEnv(sender.tab?.url, request.company);
         const orderNo = String(request.orderNo || "").trim();
         const updates = Array.isArray(request.updates) ? request.updates : [];
         if (!orderNo) {
@@ -230,7 +254,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        const baseUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines`;
+        const baseUrl = `https://${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/salesDocumentLines`;
         const getUrl = `${baseUrl}?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
         const getRes = await fetch(getUrl, {
           method: "GET",
@@ -438,6 +462,10 @@ const triedODataAuthReqs = new Set();
 if (chrome.webRequest && chrome.webRequest.onAuthRequired) {
   chrome.webRequest.onAuthRequired.addListener(
     (details, callback) => {
+      if (!details.url || !details.url.includes(":7048/")) {
+        callback({});
+        return;
+      }
       if (triedODataAuthReqs.has(details.requestId)) {
         triedODataAuthReqs.delete(details.requestId);
         callback({ cancel: true });
@@ -459,7 +487,7 @@ if (chrome.webRequest && chrome.webRequest.onAuthRequired) {
         }
       });
     },
-    { urls: ["https://amfbc.amf.lv:7048/*"] },
+    { urls: ["https://*/*"] },
     ["asyncBlocking"]
   );
 }

@@ -1,10 +1,10 @@
 /* ==========================================================================
    BC atlaižu pārvaldnieks - Stili
-   Pielāgots Microsoft Dynamics 365 Business Central un AM Furnitūra dizainam
+   Pielāgots Microsoft Dynamics 365 Business Central dizainam
    ========================================================================== */
 
 :root {
-  --bcm-primary: #ff5501;         /* AM Furnitūra Oranžs */
+  --bcm-primary: #ff5501;         /* Akcenta oranžs */
   --bcm-primary-hover: #e04b00;
   --bcm-primary-light: #fff3ec;
   --bcm-dark: #1b1f24;

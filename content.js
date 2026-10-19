@@ -5,6 +5,13 @@
 
 (function () {
   if (window.__bcmManagerLoaded) return;
+  if (
+    location.port !== "8443" &&
+    location.port !== "7048" &&
+    !/[?&](company|page|tenant)=/i.test(location.search)
+  ) {
+    return;
+  }
   window.__bcmManagerLoaded = true;
 
   console.log("[BC atlaižu pārvaldnieks] Sākotnējā ielāde Business Central lapā.");
@@ -12,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.2";
+  const APP_VERSION = "2.2.3";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -1964,7 +1971,7 @@
                   type="text" 
                   id="bcm-client-no-input" 
                   value="${escapeHtml(headerInfo.relatedCustomerNo || '')}" 
-                  placeholder="Piem. K318220" 
+                  placeholder="Klienta kods" 
                   style="padding: 2px 7px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 700; width: 100px; font-size: 12px; text-transform: uppercase;"
                   title="Ievadiet vai mainiet saistītā klienta kodu"
                 />
@@ -2486,7 +2493,14 @@
     writeDiscountToCell(cell, discountValue);
   }
 
-  function promptODataCredentials(defaultUsername = "AMF\\kasparsc") {
+  async function promptODataCredentials() {
+    let savedUser = "";
+    try {
+      const st = await chrome.storage.local.get(["bc_odata_credentials"]);
+      if (st.bc_odata_credentials && st.bc_odata_credentials.username) {
+        savedUser = st.bc_odata_credentials.username;
+      }
+    } catch (e) {}
     return new Promise((resolve) => {
       const targetDoc = getTargetDoc();
       const existing = targetDoc.getElementById("bcm-auth-modal");
@@ -2509,7 +2523,7 @@
           <div style="padding: 18px 22px; display: flex; flex-direction: column; gap: 12px;">
             <div>
               <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">BC lietotājvārds:</label>
-              <input id="bcm-auth-user" type="text" value="${escapeHtml(defaultUsername)}" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;" />
+              <input id="bcm-auth-user" type="text" value="${escapeHtml(savedUser)}" placeholder="DOMĒNS\\lietotājs" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;" />
             </div>
             <div>
               <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">BC parole:</label>
@@ -2708,7 +2722,7 @@
     return null;
   }
 
-  // Strādā gan ar oriģinālo, gan ar BC pārrakstīto formu: 'Sales Line Discount'.'Sales Code' IS 'K427800'
+  // Strādā gan ar oriģinālo, gan ar BC pārrakstīto formu: 'Sales Line Discount'.'Sales Code' IS 'K000000'
   function parseSalesCodeFromUrl(url) {
     if (!url) return "";
     let s = url;

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BC atlaižu pārvaldnieks",
-  "version": "2.2.2",
-  "description": "Vieds palīgs AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Business Central.",
+  "version": "2.2.3",
+  "description": "Saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Dynamics 365 Business Central.",
   "permissions": [
     "storage",
     "activeTab",
@@ -12,11 +12,8 @@
     "webRequestAuthProvider"
   ],
   "host_permissions": [
-    "*://amfbc.amf.lv/*",
-    "*://*.amf.lv/*",
-    "https://amfbc.amf.lv:7048/*",
-    "https://amfbc.amf.lv:8443/*",
-    "https://api.github.com/*"
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -24,8 +21,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://amfbc.amf.lv/*",
-        "*://*.amf.lv/*"
+        "https://*/*",
+        "http://*/*"
       ],
       "all_frames": true,
       "js": [
@@ -43,8 +40,8 @@
         "icons/*"
       ],
       "matches": [
-        "*://amfbc.amf.lv/*",
-        "*://*.amf.lv/*"
+        "https://*/*",
+        "http://*/*"
       ]
     }
   ],

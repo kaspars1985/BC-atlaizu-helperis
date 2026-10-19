@@ -3,7 +3,7 @@
 <p align="center">
   <img src="icons/icon128.png" width="96" height="96" alt="BC atlaižu pārvaldnieks Logo" /><br>
   <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest"><img src="https://img.shields.io/github/v/release/kaspars1985/BC-atlaizu-helperis?label=Laidiens&color=ff5501" alt="Latest Release"></a>
-  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v2.2.2/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
+  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v2.2.3/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
 </p>
 
 Pārlūka paplašinājums darbam ar Microsoft Dynamics 365 Business Central.
@@ -49,4 +49,4 @@ Lai katrai rindai nebūtu manuāli jāmeklē meistara līguma atlaides un ar rok
    Pārskati sagatavoto rindu sarakstu. Ja nepieciešams, kādai rindai procentu vari palabot ar roku. Pēc tam nospied "Automātiski ierakstīt".
 
 5. **Autorizācija un pārrēķins**  
-   Pirmajā reizē paplašinājums palūgs ievadīt tavu BC lietotājvārdu (`AMF\...`) un paroli, lai varētu caur OData servisu (`:7048`) ierakstīt atlaides visām rindām vienlaicīgi. Pēc ierakstīšanas nospied `F5`, lai Business Central pārrēķina pasūtījuma summas.
+   Pirmajā reizē paplašinājums palūgs ievadīt tavu BC lietotājvārdu (`DOMĒNS\lietotājs`) un paroli, lai varētu caur OData servisu (`:7048`) ierakstīt atlaides visām rindām vienlaicīgi. Pēc ierakstīšanas nospied `F5`, lai Business Central pārrēķina pasūtījuma summas.

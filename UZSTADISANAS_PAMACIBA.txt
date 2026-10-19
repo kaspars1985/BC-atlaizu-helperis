@@ -1,5 +1,5 @@
 ========================================================================
-BC ATLAIŽU PĀRVALDNIEKS (AM Furnitūra) - LIETOŠANAS UN UZSTĀDĪŠANAS PAMĀCĪBA
+BC ATLAIŽU PĀRVALDNIEKS - LIETOŠANAS UN UZSTĀDĪŠANAS PAMĀCĪBA
 ========================================================================
 
 KAM ŠIS RĪKS IR PAREDZĒTS:
@@ -43,7 +43,7 @@ KĀ LIETOT IKDIENĀ:
    pārlūka atmiņā).
 5. Pārskati sarakstu (vajadzības gadījumā kādai rindai procentu vari
    pamainīt ar roku) un nospied "Automātiski ierakstīt".
-6. Pirmajā reizē paplašinājums paprasīs tavu BC lietotājvārdu (AMF\...)
+6. Pirmajā reizē paplašinājums paprasīs tavu BC lietotājvārdu (DOMĒNS\lietotājs)
    un paroli, lai caur OData (:7048) varētu ierakstīt atlaides visām rindām
    uzreiz.
 7. Pēc ierakstīšanas nospied F5, lai Business Central pārrēķina summas.
