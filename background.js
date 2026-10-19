@@ -160,7 +160,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // ODataV4 palīgfunkcijas
+  // ODataV4 palīgfunkcijas (caur amfbc.amf.lv:7048 cilnes kontekstu, lai NTLM/Windows Auth strādātu 100%)
   function getCompanyFromUrl(url) {
     if (!url) return "AM Furnitūra EUR";
     try {
@@ -171,45 +171,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return "AM Furnitūra EUR";
   }
 
-  async function warmUpODataAuth() {
-    try {
-      const authUrl = "https://amfbc.amf.lv:7048/AMF/ODataV4/Company('AM%20Furnit%C5%ABra%20EUR')/salesDocumentLines?$top=1";
-      const authTab = await chrome.tabs.create({ url: authUrl, active: false });
-      await new Promise((resolve) => {
-        const timer = setTimeout(() => {
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }, 3500);
-        function listener(tabId, info) {
-          if (tabId === authTab.id && info.status === "complete") {
-            clearTimeout(timer);
-            chrome.tabs.onUpdated.removeListener(listener);
-            setTimeout(resolve, 250);
-          }
-        }
-        chrome.tabs.onUpdated.addListener(listener);
-      });
-      if (authTab && authTab.id) {
-        try { await chrome.tabs.remove(authTab.id); } catch (e) {}
+  let odataHelperTabId = null;
+  let odataTabCleanupTimer = null;
+
+  function scheduleODataTabCleanup(delayMs = 90000) {
+    clearTimeout(odataTabCleanupTimer);
+    odataTabCleanupTimer = setTimeout(async () => {
+      if (odataHelperTabId) {
+        const idToRemove = odataHelperTabId;
+        odataHelperTabId = null;
+        try { await chrome.tabs.remove(idToRemove); } catch (e) {}
       }
-    } catch (e) {
-      console.warn("[BC atlaižu pārvaldnieks] Auth warmup kļūda:", e);
-    }
+    }, delayMs);
   }
 
-  async function fetchODataWithAuth(url, options = {}) {
-    let res;
-    try {
-      res = await fetch(url, { credentials: "include", ...options });
-    } catch (netErr) {
-      await warmUpODataAuth();
-      res = await fetch(url, { credentials: "include", ...options });
+  async function getOrCreateODataTab(company) {
+    // 1. Pārbaudām, vai mūsu palīgcilne vēl pastāv
+    if (odataHelperTabId) {
+      try {
+        const t = await chrome.tabs.get(odataHelperTabId);
+        if (t && t.id && (t.url || "").includes(":7048")) {
+          scheduleODataTabCleanup(90000);
+          return t.id;
+        }
+      } catch (e) {
+        odataHelperTabId = null;
+      }
     }
-    if (res.status === 401 || res.status === 403) {
-      await warmUpODataAuth();
-      res = await fetch(url, { credentials: "include", ...options });
+
+    // 2. Pārbaudām, vai jau ir atvērta kāda cita :7048 cilne
+    const existingTabs = await chrome.tabs.query({ url: "https://amfbc.amf.lv:7048/*" });
+    if (existingTabs && existingTabs.length > 0 && existingTabs[0].id) {
+      return existingTabs[0].id;
     }
-    return res;
+
+    // 3. Izveidojam fona palīgcilni uz :7048
+    const authUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines?$top=1`;
+    const newTab = await chrome.tabs.create({ url: authUrl, active: false });
+    odataHelperTabId = newTab.id;
+
+    await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }, 5000);
+      function listener(tabId, info) {
+        if (tabId === newTab.id && info.status === "complete") {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          setTimeout(resolve, 150);
+        }
+      }
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+
+    scheduleODataTabCleanup(90000);
+    return newTab.id;
   }
 
   // ODataV4: Pasūtījuma rindu nolasīšana
@@ -222,16 +239,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: "NO_ORDER_NO" });
           return;
         }
+
+        const tabId = await getOrCreateODataTab(company);
         const odataUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
-        const res = await fetchODataWithAuth(odataUrl, {
-          method: "GET",
-          headers: { "Accept": "application/json" }
+
+        const execResults = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: async (url) => {
+            try {
+              const r = await fetch(url, {
+                method: "GET",
+                credentials: "include",
+                headers: { "Accept": "application/json" }
+              });
+              if (!r.ok) {
+                return { ok: false, status: r.status, error: (await r.text()) || `HTTP ${r.status}` };
+              }
+              const data = await r.json();
+              return { ok: true, lines: data.value || [] };
+            } catch (e) {
+              return { ok: false, error: String(e) };
+            }
+          },
+          args: [odataUrl]
         });
-        if (res.ok) {
-          const data = await res.json();
-          sendResponse({ success: true, lines: data.value || [] });
+
+        const res = execResults && execResults[0] && execResults[0].result;
+        if (res && res.ok) {
+          sendResponse({ success: true, lines: res.lines || [] });
         } else {
-          sendResponse({ success: false, status: res.status, error: await res.text() });
+          sendResponse({ success: false, status: res?.status, error: res?.error || "Neizdevās nolasīt OData rindas" });
         }
       } catch (err) {
         sendResponse({ success: false, error: String(err) });
@@ -252,77 +289,101 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        // 1. solis: Ielasa aktuālās pasūtījuma rindas
-        const getUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
-        const getRes = await fetchODataWithAuth(getUrl, {
-          method: "GET",
-          headers: { "Accept": "application/json" }
-        });
-        if (!getRes.ok) {
-          sendResponse({ success: false, status: getRes.status, error: await getRes.text() });
-          return;
-        }
-        const getData = await getRes.json();
-        const serverLines = getData.value || [];
+        const tabId = await getOrCreateODataTab(company);
 
-        // 2. solis: Katram u no updates
-        let updatedCount = 0;
-        const failedIds = [];
-        const usedLineNumbers = new Set();
+        const execResults = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: async (comp, ordNo, updList) => {
+            try {
+              const baseUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(comp)}')/salesDocumentLines`;
+              const getUrl = `${baseUrl}?$filter=${encodeURIComponent("documentNumber eq '" + ordNo + "'")}`;
+              const getRes = await fetch(getUrl, {
+                method: "GET",
+                credentials: "include",
+                headers: { "Accept": "application/json" }
+              });
+              if (!getRes.ok) {
+                return { success: false, status: getRes.status, error: (await getRes.text()) || `HTTP ${getRes.status}` };
+              }
+              const getData = await getRes.json();
+              const serverLines = getData.value || [];
 
-        for (const u of updates) {
-          let targetRow = null;
-          if (u.lineNumber) {
-            targetRow = serverLines.find(r => r.lineNumber === u.lineNumber);
-          }
-          if (!targetRow && u.itemCode) {
-            const code = String(u.itemCode || "").trim().toUpperCase();
-            const matchedRows = serverLines
-              .filter(r => r.type === "Item" && String(r.number || "").trim().toUpperCase() === code)
-              .sort((a, b) => (Number(a.lineNumber) || 0) - (Number(b.lineNumber) || 0));
-            const ordIdx = Number(u.ordinal) || 0;
-            targetRow = matchedRows[ordIdx] || matchedRows.find(r => !usedLineNumbers.has(r.lineNumber)) || matchedRows[0] || null;
-          }
-          if (targetRow) usedLineNumbers.add(targetRow.lineNumber);
+              let updatedCount = 0;
+              const failedIds = [];
+              const usedLineNumbers = new Set();
 
-          if (!targetRow) {
-            failedIds.push(u.id);
-            continue;
-          }
+              for (const u of updList) {
+                let targetRow = null;
+                if (u.lineNumber) {
+                  targetRow = serverLines.find(r => r.lineNumber === u.lineNumber);
+                }
+                if (!targetRow && u.itemCode) {
+                  const code = String(u.itemCode || "").trim().toUpperCase();
+                  const matchedRows = serverLines
+                    .filter(r => r.type === "Item" && String(r.number || "").trim().toUpperCase() === code)
+                    .sort((a, b) => (Number(a.lineNumber) || 0) - (Number(b.lineNumber) || 0));
+                  const ordIdx = Number(u.ordinal) || 0;
+                  targetRow = matchedRows[ordIdx] || matchedRows.find(r => !usedLineNumbers.has(r.lineNumber)) || matchedRows[0] || null;
+                }
+                if (targetRow) usedLineNumbers.add(targetRow.lineNumber);
 
-          if (Math.abs((Number(targetRow.lineDiscountPercent) || 0) - Number(u.newDiscount)) < 0.05) {
-            updatedCount++;
-            continue;
-          }
+                if (!targetRow) {
+                  failedIds.push(u.id);
+                  continue;
+                }
 
-          const patchUrl = `https://amfbc.amf.lv:7048/AMF/ODataV4/Company('${encodeURIComponent(company)}')/salesDocumentLines(documentType='${encodeURIComponent(targetRow.documentType)}',documentNumber='${encodeURIComponent(targetRow.documentNumber)}',lineNumber=${targetRow.lineNumber})`;
-          const patchOptions = {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-              "If-Match": "*"
-            },
-            body: JSON.stringify({ lineDiscountPercent: Number(u.newDiscount) })
-          };
+                if (Math.abs((Number(targetRow.lineDiscountPercent) || 0) - Number(u.newDiscount)) < 0.05) {
+                  updatedCount++;
+                  continue;
+                }
 
-          let patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
-          if (!patchRes.ok && [409, 412, 500, 503].includes(patchRes.status)) {
-            for (const waitMs of [80, 180, 350]) {
-              if (patchRes.ok) break;
-              await new Promise(r => setTimeout(r, waitMs));
-              patchRes = await fetchODataWithAuth(patchUrl, patchOptions);
+                const patchUrl = `${baseUrl}(documentType='${encodeURIComponent(targetRow.documentType)}',documentNumber='${encodeURIComponent(targetRow.documentNumber)}',lineNumber=${targetRow.lineNumber})`;
+                const patchOptions = {
+                  method: "PATCH",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "If-Match": "*"
+                  },
+                  body: JSON.stringify({ lineDiscountPercent: Number(u.newDiscount) })
+                };
+
+                let patchRes = await fetch(patchUrl, patchOptions);
+                if (!patchRes.ok && [409, 412, 500, 503].includes(patchRes.status)) {
+                  for (const waitMs of [80, 180, 350]) {
+                    if (patchRes.ok) break;
+                    await new Promise(r => setTimeout(r, waitMs));
+                    patchRes = await fetch(patchUrl, patchOptions);
+                  }
+                }
+
+                if (patchRes.ok) {
+                  updatedCount++;
+                } else {
+                  failedIds.push(u.id);
+                }
+              }
+
+              return { success: true, updatedCount, failedIds };
+            } catch (e) {
+              return { success: false, error: String(e) };
             }
-          }
+          },
+          args: [company, orderNo, updates]
+        });
 
-          if (patchRes.ok) {
-            updatedCount++;
-          } else {
-            failedIds.push(u.id);
-          }
+        // Pēc izpildes aizveram palīgcilni, ja mēs to paši izveidojām
+        if (odataHelperTabId) {
+          scheduleODataTabCleanup(1500);
         }
 
-        sendResponse({ success: true, updatedCount, failedIds });
+        const res = execResults && execResults[0] && execResults[0].result;
+        if (res) {
+          sendResponse(res);
+        } else {
+          sendResponse({ success: false, error: "Neizdevās izpildīt skriptu OData cilnē" });
+        }
       } catch (err) {
         sendResponse({ success: false, error: String(err) });
       }
