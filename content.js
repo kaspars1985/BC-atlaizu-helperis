@@ -12,7 +12,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.1";
+  const APP_VERSION = "2.2.2";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -2486,6 +2486,66 @@
     writeDiscountToCell(cell, discountValue);
   }
 
+  function promptODataCredentials(defaultUsername = "AMF\\kasparsc") {
+    return new Promise((resolve) => {
+      const targetDoc = getTargetDoc();
+      const existing = targetDoc.getElementById("bcm-auth-modal");
+      if (existing) existing.remove();
+
+      const wrap = targetDoc.createElement("div");
+      wrap.id = "bcm-auth-modal";
+      wrap.className = "bcm-modal-overlay";
+      wrap.innerHTML = `
+        <div class="bcm-modal-card" style="max-width: 420px; padding: 0;">
+          <div class="bcm-modal-header">
+            <div class="bcm-modal-title-box">
+              <div class="bcm-logo-icon">🔑</div>
+              <div>
+                <h3 class="bcm-modal-title">BC OData pieslēgšanās</h3>
+                <div class="bcm-modal-subtitle">Vienreizēja autorizācija momentālai atlaižu ierakstīšanai</div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 18px 22px; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">BC lietotājvārds:</label>
+              <input id="bcm-auth-user" type="text" value="${escapeHtml(defaultUsername)}" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;" />
+            </div>
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">BC parole:</label>
+              <input id="bcm-auth-pass" type="password" placeholder="Ievadiet savu BC paroli..." style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;" />
+            </div>
+          </div>
+          <div class="bcm-modal-footer" style="justify-content: flex-end; gap: 8px;">
+            <button class="bcm-btn bcm-btn-secondary" id="bcm-auth-cancel">Atcelt</button>
+            <button class="bcm-btn bcm-btn-primary" id="bcm-auth-save">Saglabāt un ierakstīt</button>
+          </div>
+        </div>
+      `;
+      (targetDoc.body || document.body).appendChild(wrap);
+      const passInput = wrap.querySelector("#bcm-auth-pass");
+      if (passInput) passInput.focus();
+
+      const finish = (val) => {
+        wrap.remove();
+        resolve(val);
+      };
+      wrap.querySelector("#bcm-auth-cancel").addEventListener("click", () => finish(null));
+      const submit = async () => {
+        const u = wrap.querySelector("#bcm-auth-user").value.trim();
+        const p = wrap.querySelector("#bcm-auth-pass").value;
+        if (!u || !p) return;
+        await chrome.runtime.sendMessage({ action: "SAVE_ODATA_CREDENTIALS", username: u, password: p });
+        finish({ username: u, password: p });
+      };
+      wrap.querySelector("#bcm-auth-save").addEventListener("click", submit);
+      wrap.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submit();
+        if (e.key === "Escape") finish(null);
+      });
+    });
+  }
+
   async function executeApplyDiscounts(lines) {
     const linesToUpdate = lines.filter(l => l.newDiscount > 0);
     const total = linesToUpdate.length;
@@ -2525,7 +2585,7 @@
 
       showToast(`⚡ Momentāli ieraksta atlaides serverī (${total} rindās)...`, "info");
 
-      const odataRes = await chrome.runtime.sendMessage({
+      let odataRes = await chrome.runtime.sendMessage({
         action: "ODATA_APPLY_DISCOUNTS",
         orderNo,
         updates: linesToUpdate.map(l => ({
@@ -2538,6 +2598,26 @@
           documentNumber: l.documentNumber
         }))
       });
+
+      if (odataRes && (odataRes.authRequired || odataRes.status === 401 || odataRes.status === 403)) {
+        const creds = await promptODataCredentials();
+        if (creds) {
+          showToast(`⚡ Atkārto ierakstīšanu ar jauno autorizāciju...`, "info");
+          odataRes = await chrome.runtime.sendMessage({
+            action: "ODATA_APPLY_DISCOUNTS",
+            orderNo,
+            updates: linesToUpdate.map(l => ({
+              id: l.id,
+              itemCode: l.itemCode,
+              ordinal: l.ordinal || 0,
+              newDiscount: l.newDiscount,
+              lineNumber: l.lineNumber,
+              documentType: l.documentType,
+              documentNumber: l.documentNumber
+            }))
+          });
+        }
+      }
 
       if (!odataRes || !odataRes.success) {
         showToast(`⚠️ OData kļūda: ${(odataRes && odataRes.error) || "Neizdevās savienoties ar serveri"}`, "error");
