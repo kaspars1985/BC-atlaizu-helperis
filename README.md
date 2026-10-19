@@ -3,66 +3,50 @@
 <p align="center">
   <img src="icons/icon128.png" width="96" height="96" alt="BC atlaižu pārvaldnieks Logo" /><br>
   <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest"><img src="https://img.shields.io/github/v/release/kaspars1985/BC-atlaizu-helperis?label=Laidiens&color=ff5501" alt="Latest Release"></a>
-  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v2.1.1/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
+  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v2.2.2/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
 </p>
 
-Vieds un ērts **Microsoft Edge** un **Google Chrome** pārlūka paplašinājums AM Furnitūra darbiniekiem: saistītā klienta rindu atlaižu automātiska nolasīšana un zibenīga piemērošana **Microsoft Dynamics 365 Business Central**.
+Pārlūka paplašinājums darbam ar Microsoft Dynamics 365 Business Central.
 
 ---
 
-## 🚀 Kā tas atvieglo ikdienas darbu?
+## Kam tas domāts
 
-Bieži rodas situācija: klients (piemēram, meistars ar kodu `011420`) pasūta preces, bet rēķins un pasūtījums tiek noformēts uz citas firmas rekvizītiem (piemēram, būvfirmas rekvizītiem).
+Kad pasūtījumu formē uz vienu firmu (piemēram, būvfirmu), bet preces pērk meistars, kurš norādīts laukā "Saistītā klienta nr.", Business Central pats neieliek meistara atlaides, jo skatās tikai rēķina saņēmēja nosacījumus.
 
-### Līdz šim:
-1. Menedžeris pasūtījumā norāda `Saistītā klienta nr.`.
-2. Standarta Business Central automātiski **nepiemēro** saistītā klienta atlaides, jo tās ir piesaistītas meistaram, nevis rēķina firmai.
-3. Nācās manuāli meklēt katrai precei vai preču grupai meistara atlaides un ar roku katrai rindai ierakstīt `Rindas atlaide %`.
-
-### Ar BC atlaižu pārvaldnieku:
-1. Atverot pasūtījumu (Page 42), nospiediet **Alt+D** vai uzklikšķiniet uz rīkjoslas ikonas **"BC atlaižu pārvaldnieks"**.
-2. Atveras pārskatāms **Atlaižu priekšskatījuma logs** (ekrāns ir tīrs, bez traucējošām peldošām pogām):
-   - Parāda katru pasūtījuma rindu, artikulu, nosaukumu un daudzumu;
-   - Automātiski atrod un aprēķina precīzo atlaides % (pēc preces tiešā koda, pēc preču atlaižu grupas vai vispārējās klienta atlaides);
-   - Skaidri norāda atlaides pamatojumu;
-   - Iekrāso ar dzeltenu brīdinājumu, ja kādai rindai jau bija cita manuāla atlaide.
-3. Nospiežot **`⚡ Automātiski ierakstīt`**:
-   - Pārvaldnieks automātiski, secīgi un zibenīgi aizpilda lauku `Rindas atlaide %` visām rindām;
-   - Business Central nekavējoties pārrēķina summas un piemēro pareizās partnera cenas!
+Lai katrai rindai nebūtu manuāli jāmeklē meistara līguma atlaides un ar roku jāpārraksta procenti, šis paplašinājums atrod atbilstošās atlaides un ieraksta tās visās pasūtījuma rindās tieši caur Business Central OData servisu.
 
 ---
 
-## 📦 Uzstādīšanas instrukcija (30 sekundes)
+## Uzstādīšana
 
-### Microsoft Edge pārlūkā:
-1. Atveriet Microsoft Edge un adreses joslā ievadiet:
-   ```text
-   edge://extensions
-   ```
-2. Kreisajā sānjoslā **ieslēdziet slēdzi "Developer mode"** (Izstrādātāja režīms).
-3. Lapas augšpusē nospiediet pogu **"Load unpacked"** (Ielādēt neiepakotu).
-4. Izvēlieties šo repozitorija / paplašinājuma mapi (vai atarhivēto zip saturu).
-5. Edge rīkjoslā uzklikšķiniet uz puzles ikonas un piespraudiet (acs ikona) **"BC atlaižu pārvaldnieks"**, lai ikona vienmēr būtu redzama.
+### Microsoft Edge:
+1. Adreses joslā atver: `edge://extensions`
+2. Kreisajā pusē ieslēdz "Developer mode" (Izstrādātāja režīms).
+3. Nospied pogu "Load unpacked" (Ielādēt neiepakotu).
+4. Izvēlies šī paplašinājuma mapi (vai atpakoto zip arhīvu).
+5. Pie puzles ikonas rīkjoslā nospied acs ikonu pie "BC atlaižu pārvaldnieks", lai ikona būtu redzama pārlūka joslā.
 
----
-
-### Google Chrome pārlūkā:
-1. Atveriet Google Chrome un adreses joslā ievadiet:
-   ```text
-   chrome://extensions
-   ```
-2. Augšējā labajā stūrī **ieslēdziet slēdzi "Izstrādātāja režīms" (Developer mode)**.
-3. Augšējā kreisajā stūrī nospiediet **"Ielādēt neiepakotu" (Load unpacked)** un izvēlieties šo pašu mapi.
+### Google Chrome:
+1. Adreses joslā atver: `chrome://extensions`
+2. Augšējā labajā stūrī ieslēdz "Developer mode".
+3. Nospied "Load unpacked" un norādi paplašinājuma mapi.
 
 ---
 
-## 🛠️ Kā pirmoreiz ielasīt klienta atlaides no Page 7004?
+## Kā lietot
 
-1. Pārvaldnieka logā (vai nospiežot `🔄 Atjaunot no Page 7004`) atveriet lapu 7004:
-   ```text
-   https://amfbc.amf.lv:8443/AMF/?page=7004
-   ```
-2. Augšējā filtra joslā laukā **"Pārdošanas kods"** ievadiet klienta numuru (piemēram `011420`).
-3. Lapas pašā augšā parādīsies zila josla: **"⚡ BC atlaižu pārvaldnieks: Gatavs nolasīt un saglabāt šī klienta rindu atlaides kešā"**.
-4. Nospiediet pogu **"💾 Saglabāt atlaides"**.
-5. Gatavs! Visas šī klienta atlaides ir saglabātas un turpmāk automātiski darbosies visos viņa pasūtījumos!
+1. **Atver pasūtījumu**  
+   Business Central atver pārdošanas pasūtījumu, kurā ir aizpildīts lauks "Saistītā klienta nr.". Pašā BC ekrānā nekādu lieku pogu nav.
+
+2. **Atver atlaižu logu**  
+   Nospied tastatūras saīsni `Alt+D` vai uzklikšķini uz paplašinājuma ikonas pārlūka augšējā joslā.
+
+3. **Klienta atlaižu ielasīšana (tikai pirmajā reizē)**  
+   Ja konkrētajam saistītajam klientam atlaides vēl nav nolasītas, atvērtajā logā nospied pogu, lai tās ielasītu no 7004. lapas. Tas aizņem pāris sekundes, un dati saglabājas pārlūka atmiņā turpmākam darbam.
+
+4. **Pārbaudi un ieraksti**  
+   Pārskati sagatavoto rindu sarakstu. Ja nepieciešams, kādai rindai procentu vari palabot ar roku. Pēc tam nospied "Automātiski ierakstīt".
+
+5. **Autorizācija un pārrēķins**  
+   Pirmajā reizē paplašinājums palūgs ievadīt tavu BC lietotājvārdu (`AMF\...`) un paroli, lai varētu caur OData servisu (`:7048`) ierakstīt atlaides visām rindām vienlaicīgi. Pēc ierakstīšanas nospied `F5`, lai Business Central pārrēķina pasūtījuma summas.

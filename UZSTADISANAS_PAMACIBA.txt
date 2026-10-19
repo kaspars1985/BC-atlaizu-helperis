@@ -1,49 +1,50 @@
 ========================================================================
-BC ATLAIŽU PĀRVALDNIEKS (AM Furnitūra) - UZSTĀDĪŠANAS PAMĀCĪBA
+BC ATLAIŽU PĀRVALDNIEKS (AM Furnitūra) - LIETOŠANAS UN UZSTĀDĪŠANAS PAMĀCĪBA
 ========================================================================
 
-Šis paplašinājums paredzēts darbam ar Microsoft Dynamics 365 Business Central
-(https://amfbc.amf.lv:8443).
-
-Tas automātiski atpazīst pasūtījumā norādīto "Saistītā klienta nr.",
-atrod viņa personīgās rindu atlaides un zibenīgi ieraksta tās
-pasūtījuma rindās.
+KAM ŠIS RĪKS IR PAREDZĒTS:
+Kad pasūtījumu formē uz vienu firmu (piemēram, būvfirmu), bet preces pērk
+meistars, kurš norādīts laukā "Saistītā klienta nr.", Business Central pats
+meistara atlaides neieliek. Lai katrai rindai nebūtu jāmeklē un manuāli
+jāvada procenti, paplašinājums atrod atlaides un ieraksta tās visām
+pasūtījuma rindām caur OData servisu.
 
 ------------------------------------------------------------------------
-UZSTĀDĪŠANA MICROSOFT EDGE PĀRLŪKĀ (Aizņem 30 sekundes):
+UZSTĀDĪŠANA MICROSOFT EDGE PĀRLŪKĀ:
 ------------------------------------------------------------------------
-1. Atveriet Microsoft Edge.
-2. Adreses joslā augšā ierakstiet:
+1. Adreses joslā ieraksti:
    edge://extensions
-   un nospiediet Enter.
+   un nospied Enter.
 
-3. Kreisajā sānjoslā IESLĒDZIET slēdzi "Developer mode" (Izstrādātāja režīms).
+2. Kreisajā sānjoslā ieslēdz slēdzi "Developer mode" (Izstrādātāja režīms).
 
-4. Lapas augšpusē parādīsies poga "Load unpacked" (Ielādēt neiepakotu).
-   Uzklikšķiniet uz tās.
+3. Augšpusē nospied pogu "Load unpacked" (Ielādēt neiepakotu).
 
-5. Izvēlieties šo mapi:
-   C:\Users\KasparsCiematnieks\Desktop\ANTIGRAVITY\BC menedžera palīgs
+4. Izvēlies šo mapi (vai atpakoto zip arhīvu).
 
-6. Edge rīkjoslā (pie puzles ikonas) uzklikšķiniet uz acs ikonas pie 
-   "BC atlaižu pārvaldnieks", lai tā vienmēr būtu redzama.
+5. Edge rīkjoslā pie puzles ikonas piespraud acs ikonu pie
+   "BC atlaižu pārvaldnieks", lai ikona būtu redzama pārlūka joslā.
+
+------------------------------------------------------------------------
+UZSTĀDĪŠANA GOOGLE CHROME PĀRLŪKĀ:
+------------------------------------------------------------------------
+1. Adreses joslā ieraksti: chrome://extensions
+2. Ieslēdz "Developer mode" (augšā pa labi).
+3. Nospied "Load unpacked" un izvēlies paplašinājuma mapi.
 
 ------------------------------------------------------------------------
 KĀ LIETOT IKDIENĀ:
 ------------------------------------------------------------------------
-1. Atveriet jebkuru pasūtījumu Business Central (PPAS...).
-2. Nospiediet Alt+D vai uzklikšķiniet uz "BC atlaižu pārvaldnieks"
-   ikonas Edge rīkjoslā.
-3. Atvērsies priekšskatījuma logs (ekrānā nav traucējošu peldošu pogu).
-4. Nospiediet "⚡ Automātiski ierakstīt", un pārvaldnieks pats zibenīgi aizpildīs
-   "Rindas atlaide %" laukus visām precēm!
-
-------------------------------------------------------------------------
-KĀ VIENREIZ IELASĪT KLIENTA ATLAIDES:
-------------------------------------------------------------------------
-1. Atveriet Business Central atlaižu lapu:
-   https://amfbc.amf.lv:8443/AMF/?page=7004
-2. Atlasiet vajadzīgo klientu laukā "Pārdošanas kods".
-3. Lapas augšpusē nospiediet "💾 Saglabāt atlaides".
-4. Gatavs! Šī klienta atlaides turpmāk saglabāsies un darbosies automātiski.
+1. Pašā Business Central ekrānā nekādu lieku pogu nav.
+2. Atver pasūtījumu, kurā ir aizpildīts lauks "Saistītā klienta nr.".
+3. Nospied Alt+D vai uzklikšķini uz paplašinājuma ikonas pārlūka augšējā joslā.
+4. Ja šim klientam atlaides vēl nav nolasītas, logā nospied pogu, lai
+   tās ielasītu no 7004. lapas (tas aizņem pāris sekundes un saglabājas
+   pārlūka atmiņā).
+5. Pārskati sarakstu (vajadzības gadījumā kādai rindai procentu vari
+   pamainīt ar roku) un nospied "Automātiski ierakstīt".
+6. Pirmajā reizē paplašinājums paprasīs tavu BC lietotājvārdu (AMF\...)
+   un paroli, lai caur OData (:7048) varētu ierakstīt atlaides visām rindām
+   uzreiz.
+7. Pēc ierakstīšanas nospied F5, lai Business Central pārrēķina summas.
 ========================================================================
