@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.5";
+  const APP_VERSION = "2.2.6";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -2011,6 +2011,24 @@
             <button class="bcm-close-btn" id="bcm-modal-close" title="Aizvērt logu">✕</button>
           </div>
 
+          <!-- Atjauninājuma paziņojuma baneris -->
+          <div id="bcm-update-banner-box" style="${updateInfo && updateInfo.hasUpdate ? 'display: block;' : 'display: none;'} margin: 0 20px 10px 20px; padding: 10px 14px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #9a3412;">
+                <span style="font-size: 18px;">🚀</span>
+                <span id="bcm-update-banner-text"><strong>Pieejams atjauninājums: v${escapeHtml((updateInfo && updateInfo.latestVersion) || '')}!</strong> (Jums pašlaik ir v${APP_VERSION})</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <a id="bcm-update-download-btn" href="${escapeHtml((updateInfo && (updateInfo.downloadUrl || updateInfo.releaseUrl)) || '')}" target="_blank" class="bcm-btn bcm-btn-primary" style="padding: 4px 12px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; background: #ea580c; width: auto; margin: 0;">
+                  📥 Lejupielādēt .zip
+                </a>
+                <a id="bcm-update-changelog-btn" href="${escapeHtml((updateInfo && updateInfo.releaseUrl) || '')}" target="_blank" style="font-size: 12px; color: #c2410c; text-decoration: underline;">
+                  Skatīt izmaiņas
+                </a>
+              </div>
+            </div>
+          </div>
+
           <!-- Klienta informācijas josla -->
           <div class="bcm-client-banner">
             <div class="bcm-client-meta">
@@ -2115,6 +2133,23 @@
 
       (targetDoc.body || document.body).appendChild(modal);
       activeModal = modal;
+      // Asinhrona versijas pārbaude fonā, lai modālī uzreiz parādītu pamanāmu baneri
+      try {
+        chrome.runtime.sendMessage({ action: "CHECK_FOR_UPDATES" }, (res) => {
+          if (chrome.runtime.lastError) return;
+          const info = res && res.updateInfo;
+          if (info && info.hasUpdate && activeModal) {
+            const box = activeModal.querySelector("#bcm-update-banner-box");
+            const txt = activeModal.querySelector("#bcm-update-banner-text");
+            const dl = activeModal.querySelector("#bcm-update-download-btn");
+            const cl = activeModal.querySelector("#bcm-update-changelog-btn");
+            if (box) box.style.display = "block";
+            if (txt) txt.innerHTML = `<strong>Pieejams atjauninājums: v${escapeHtml(info.latestVersion)}!</strong> (Jums pašlaik ir v${APP_VERSION})`;
+            if (dl) dl.href = info.downloadUrl || info.releaseUrl;
+            if (cl) cl.href = info.releaseUrl;
+          }
+        });
+      } catch (e) {}
 
       // Brīdinājumu par trūkstošām kolonnām atjaunināšana
       const updateColumnWarnings = (curLines, scanCompleted) => {

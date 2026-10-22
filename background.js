@@ -398,7 +398,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Versijas pārbaudes dzinējs (GitHub Releases API)
 // --------------------------------------------------------------------------
 const GITHUB_REPO_API = "https://api.github.com/repos/kaspars1985/BC-atlaizu-helperis/releases/latest";
-const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 stundas
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 stunda
 
 function parseSemVer(v) {
   if (!v) return [0, 0, 0];
@@ -487,6 +487,8 @@ function triggerOpenModal(tab) {
     chrome.tabs.sendMessage(tab.id, { action: "OPEN_DISCOUNT_MODAL" }, () => {
       if (chrome.runtime.lastError) {}
     });
+    // Pārbaudām atjauninājumus fonā pie katras modāļa atvēršanas
+    checkVersionUpdate(false);
   }
 }
 
