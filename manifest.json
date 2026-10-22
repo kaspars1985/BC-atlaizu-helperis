@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BC atlaižu pārvaldnieks",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "description": "Saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Dynamics 365 Business Central.",
   "permissions": [
     "storage",

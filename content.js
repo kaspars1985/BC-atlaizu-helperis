@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.4";
+  const APP_VERSION = "2.2.5";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -2671,7 +2671,7 @@
         return;
       }
 
-      showToast(`⚡ Momentāli ieraksta atlaides serverī (${total} rindās)...`, "info");
+      showToast(`⚡ Ieraksta atlaides serverī (${total} rindās)...`, "info");
 
       let odataRes = await chrome.runtime.sendMessage({
         action: "ODATA_APPLY_DISCOUNTS",
@@ -2743,11 +2743,11 @@
       window.addEventListener("click", onAnyClick, true);
 
       if (!odataRes.failedIds || odataRes.failedIds.length === 0) {
-        showToast(`✅ Momentāli ierakstītas atlaides ${odataRes.updatedCount} no ${total} rindām!`, "success");
+        showToast(`✅ Ierakstītas atlaides ${odataRes.updatedCount} no ${total} rindām!`, "success");
       } else {
         const failedLines = linesToUpdate.filter(l => failedSet.has(l.id));
         const list = failedLines.map(l => `${l.rowIndex} (${l.itemCode})`).join(", ");
-        showToast(`⚠️ Momentāli ierakstītas ${odataRes.updatedCount}/${total}. Serveris nepieņēma rindas: ${list} (pārbaudiet, vai rindā nav kļūdas).`, "warning");
+        showToast(`⚠️ Ierakstītas ${odataRes.updatedCount}/${total}. Serveris nepieņēma rindas: ${list} (pārbaudiet, vai rindā nav kļūdas).`, "warning");
       }
     } catch (err) {
       console.error("[BC atlaižu pārvaldnieks] OData apply kļūda:", err);
