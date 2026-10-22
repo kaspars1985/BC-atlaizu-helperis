@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.3";
+  const APP_VERSION = "2.2.4";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -837,12 +837,13 @@
               let offset = null;
               const knownNames = ["No.", "Description", "Quantity", "Type", "Line Discount %", "Line Discount Pct", "LineDiscountPct"];
               for (const name of knownNames) {
-                const hCell = hCells.find(h => (h.getAttribute("controlname") || "") === name);
+                const hCell = hCells.find(h => (h.getAttribute("controlname") || "") === name || h.querySelector(`[controlname="${name}"]`));
                 if (!hCell) continue;
                 const hCellIdx = hCells.indexOf(hCell);
                 const rCell = rowElement.querySelector(`[controlname="${name}"]`);
                 if (!rCell) continue;
-                const rCellIdx = rowCells.indexOf(rCell);
+                const rTd = rCell.closest('td, th, [role=gridcell]') || rCell;
+                const rCellIdx = rowCells.indexOf(rTd);
                 if (rCellIdx >= 0 && hCellIdx >= 0) {
                   offset = rCellIdx - hCellIdx;
                   break;
@@ -929,6 +930,7 @@
       code: -1,
       desc: -1,
       qty: -1,
+      orderedQty: -1,
       discount: -1,
       price: -1,
       amount: -1,
@@ -940,6 +942,7 @@
       code: null,
       desc: null,
       qty: null,
+      orderedQty: null,
       discount: null,
       price: null,
       amount: null,
@@ -977,13 +980,11 @@
             colIndices.desc = idx;
             if (colIdx) colAriaIndices.desc = colIdx;
           } else if (cName === "quantity" || (/^(daudzums|quantity)\b/i.test(caption) && !/rezerv|pasūtīt/i.test(caption))) {
-            if (colIndices.qty === -1) {
-              colIndices.qty = idx;
-              if (colIdx) colAriaIndices.qty = colIdx;
-            }
-          } else if (/pasūtītais\s*daudzums/i.test(caption) && colIndices.qty === -1) {
             colIndices.qty = idx;
             if (colIdx) colAriaIndices.qty = colIdx;
+          } else if (/pasūtītais\s*daudzums/i.test(caption)) {
+            colIndices.orderedQty = idx;
+            if (colIdx) colAriaIndices.orderedQty = colIdx;
           } else if (cName.includes("discount") || /rind.*atlaid|atlaid.*%|line\s*disc/i.test(caption)) {
             colIndices.discount = idx;
             if (colIdx) colAriaIndices.discount = colIdx;
@@ -1028,12 +1029,13 @@
       if (headerRow) {
         const hCells = Array.from(headerRow.querySelectorAll('[role="columnheader"], th, td, [role="gridcell"]'));
         for (const name of knownNames) {
-          const hCell = hCells.find(h => (h.getAttribute("controlname") || "") === name);
+          const hCell = hCells.find(h => (h.getAttribute("controlname") || "") === name || h.querySelector(`[controlname="${name}"]`));
           if (!hCell) continue;
           const hCellIdx = hCells.indexOf(hCell);
           const rCell = row.querySelector(`[controlname="${name}"]`);
           if (!rCell) continue;
-          const rCellIdx = cells.indexOf(rCell);
+          const rTd = rCell.closest('td, th, [role=gridcell]') || rCell;
+          const rCellIdx = cells.indexOf(rTd);
           if (rCellIdx >= 0 && hCellIdx >= 0) {
             rowOffset = rCellIdx - hCellIdx;
             break;
@@ -1134,8 +1136,11 @@
         descVal = getVal(descCell);
       }
       if (!descVal || descVal.length < 3) {
+        const codeColIdx = colIndices.code >= 0 ? colIndices.code + rowOffset : -1;
         for (let i = 0; i < cells.length; i++) {
+          if (codeColIdx >= 0 && i <= codeColIdx) continue;
           const txt = getCellVal(i);
+          if (/^[A-Z0-9_.\-]+$/.test(txt)) continue;
           if (txt.length > 8 && txt !== codeVal && !txt.includes("http") && !/^\d+[\.,]\d+$/.test(txt) && !isDateString(txt)) {
             descVal = txt;
             break;
@@ -1151,6 +1156,10 @@
       } else if (colIndices.qty >= 0) {
         const realIdx = colIndices.qty + rowOffset;
         if (realIdx >= 0 && realIdx < cells.length) rawQty = getCellVal(realIdx);
+      }
+      if (!rawQty) {
+        const orderedQtyCell = getCellByCol(colAriaIndices.orderedQty, colIndices.orderedQty);
+        if (orderedQtyCell) rawQty = getVal(orderedQtyCell);
       }
       const qty = parseNum(rawQty || "1") || 1;
 
@@ -1689,6 +1698,9 @@
       const codeUpper = (line.itemCode || "").toUpperCase().trim();
       const descUpper = (line.description || "").toUpperCase().trim();
       const groupCodeUpper = (line.groupCode || "").toUpperCase().trim();
+      const itemDiscGroupUpper = (line.itemDiscGroup || '').toUpperCase().trim();
+      const groupPrefix = groupCodeUpper.includes('_') ? groupCodeUpper.split('_')[0] : '';
+      const discGroupPrefix = itemDiscGroupUpper.includes('_') ? itemDiscGroupUpper.split('_')[0] : '';
       const lineUomUpper = (line.uom || "").toUpperCase().trim();
       const qty = line.qty;
 
@@ -1719,21 +1731,33 @@
 
         // B. Preču atlaižu grupa (Preces atlaides grupa)
         if (/grup|disc|atlai/i.test(ruleType) && ruleCodeUpper) {
-          // Primāri: sakrīt ar ShortcutDimCode6
-          if (groupCodeUpper && ruleCodeUpper === groupCodeUpper) {
+          // Primāri: precīza sakritība ar grupas kodu vai preces atlaižu grupu
+          if ((groupCodeUpper && ruleCodeUpper === groupCodeUpper) || (itemDiscGroupUpper && ruleCodeUpper === itemDiscGroupUpper)) {
             candidates.push({
               rule,
-              priority: 2,
-              reason: `Grupas "${rule.code}" atlaide (${rule.discountPercent}%)`
+              priority: 2.2,
+              reason: `Grupas ${rule.code} atlaide (${rule.discountPercent}%)`
+            });
+            continue;
+          }
+          // Bāzes grupas prefikss pirms apakšsvītras
+          else if ((groupPrefix && ruleCodeUpper === groupPrefix) || (discGroupPrefix && ruleCodeUpper === discGroupPrefix)) {
+            candidates.push({
+              rule,
+              priority: 2.1,
+              reason: `Grupas ${rule.code} atlaide (${rule.discountPercent}%)`
             });
             continue;
           }
           // Sekundāri: sakrīt ar kādu citu šūnas tekstu šajā rindā
-          if (line.rowCellTexts && line.rowCellTexts.some(txt => txt.toUpperCase() === ruleCodeUpper)) {
+          else if (line.rowCellTexts && line.rowCellTexts.some(txt => {
+            const u = txt.toUpperCase();
+            return u === ruleCodeUpper || (/^\d{4}_\d+$/.test(u) && u.split('_')[0] === ruleCodeUpper);
+          })) {
             candidates.push({
               rule,
               priority: 2,
-              reason: `Grupas "${rule.code}" atlaide (${rule.discountPercent}%)`
+              reason: `Grupas ${rule.code} atlaide (${rule.discountPercent}%)`
             });
             continue;
           }
@@ -1821,10 +1845,31 @@
 
       if (headerInfo.orderNo) {
         try {
-          const odataRes = await chrome.runtime.sendMessage({
+          const bcDoc = getBCDocument();
+          const hrefSource = (bcDoc && bcDoc.location && bcDoc.location.href) || window.location.href || '';
+          let company = '';
+          try {
+            company = new URL(hrefSource).searchParams.get('company') || '';
+          } catch (_) {
+            company = '';
+          }
+
+          let odataRes = await chrome.runtime.sendMessage({
             action: "ODATA_GET_ORDER_LINES",
-            orderNo: headerInfo.orderNo
+            orderNo: headerInfo.orderNo,
+            company
           }).catch(() => null);
+
+          if (odataRes && (odataRes.authRequired || odataRes.status === 401 || odataRes.status === 403)) {
+            const creds = await promptODataCredentials();
+            if (creds) {
+              odataRes = await chrome.runtime.sendMessage({
+                action: "ODATA_GET_ORDER_LINES",
+                orderNo: headerInfo.orderNo,
+                company
+              }).catch(() => null);
+            }
+          }
 
           if (odataRes && odataRes.success && Array.isArray(odataRes.lines) && odataRes.lines.length > 0) {
             const odataItems = odataRes.lines.filter(r => r.type === "Item" && r.number);
@@ -1843,7 +1888,10 @@
                   domLine.lineNumber = oRow.lineNumber;
                   domLine.documentType = oRow.documentType;
                   domLine.documentNumber = oRow.documentNumber;
-                  domLine.groupCode = domLine.groupCode || oRow.itemCategoryCode || "";
+                  domLine.description = oRow.description || domLine.description || '';
+                  domLine.qty = Number(oRow.quantity) || domLine.qty || 1;
+                  domLine.groupCode = oRow.itemCategoryCode || oRow.itemDiscGroup || domLine.groupCode || '';
+                  domLine.itemDiscGroup = oRow.itemDiscGroup || '';
                   domLine.uom = domLine.uom || oRow.unitOfMeasureCode || oRow.unitOfMeasure || "";
                   domLine.currentDiscount = Number(oRow.lineDiscountPercent) || domLine.currentDiscount || 0;
                   odataEnriched.push(domLine);
@@ -1855,7 +1903,8 @@
                     description: oRow.description || "",
                     qty: Number(oRow.quantity) || 1,
                     uom: oRow.unitOfMeasureCode || oRow.unitOfMeasure || "",
-                    groupCode: oRow.itemCategoryCode || "",
+                    groupCode: oRow.itemCategoryCode || oRow.itemDiscGroup || "",
+                    itemDiscGroup: oRow.itemDiscGroup || "",
                     currentDiscount: Number(oRow.lineDiscountPercent) || 0,
                     newDiscount: Number(oRow.lineDiscountPercent) || 0,
                     lineNumber: oRow.lineNumber,
@@ -2200,11 +2249,36 @@
       const bindScanAllBtn = () => {
         const scanAllBtn = modal.querySelector("#bcm-scan-all-lines-btn");
         if (!scanAllBtn) return;
-        scanAllBtn.addEventListener("click", () => {
+        scanAllBtn.addEventListener("click", async () => {
+          if (!lines.odataLoaded) {
+            scanAllBtn.disabled = true;
+            try {
+              const allExtracted = await extractAllSalesLines(null, knownGroupCodes);
+              const matchedAll = await matchDiscountsForLines(allExtracted, headerInfo.relatedCustomerNo);
+              lines.length = 0;
+              matchedAll.forEach(l => lines.push(l));
+              lines.hasDiscountColumn = allExtracted.hasDiscountColumn;
+              lines.hasGroupColumn = allExtracted.hasGroupColumn;
+              const tbody = modal.querySelector("#bcm-table-body");
+              if (tbody) {
+                tbody.innerHTML = renderTableRows(lines);
+              }
+              bindDiscountInputs();
+              attachReloadListener();
+              updateModalSummaryAndButton();
+              updateColumnWarnings(lines, true);
+            } catch (e) {
+              console.warn("[BC Atlaižu Helperis] Scan-all kļūda:", e);
+            } finally {
+              scanAllBtn.disabled = false;
+            }
+            return;
+          }
           openDiscountManagerModal(headerInfo.relatedCustomerNo);
         });
       };
       bindScanAllBtn();
+      if (!lines.odataLoaded) updateColumnWarnings(lines, true);
 
       modal.querySelector("#bcm-copy-clipboard-btn").addEventListener("click", () => {
         copyDiscountsToClipboard(lines);

@@ -54,6 +54,9 @@ async function resolveBcEnv(senderUrl, reqCompany) {
     instance: (parsed && parsed.instance) || prev.instance || "BC",
     company: reqCompany || (parsed && parsed.company) || prev.company || ""
   };
+  if (!env.company) {
+    env.company = "AM Furnitūra EUR";
+  }
   if (env.hostname && env.company) {
     await chrome.storage.local.set({ bc_env_config: env });
   }
@@ -226,7 +229,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         if (res.ok) {
           const data = await res.json();
-          sendResponse({ success: true, lines: data.value || [] });
+          const lines = data.value || [];
+
+          const itemNumbers = Array.from(new Set(
+            lines
+              .filter(r => r.type === "Item" && r.number)
+              .map(r => String(r.number))
+          ));
+
+          try {
+            const itemInfo = {};
+            for (let i = 0; i < itemNumbers.length; i += 25) {
+              const batch = itemNumbers.slice(i, i + 25);
+              const orExpr = batch.map(n => `number eq '${n.replace(/'/g, "''")}'`).join(" or ");
+              const itemUrl = `https://${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/AustraItem?$filter=${encodeURIComponent(orExpr)}&$select=number,itemDiscGroup,itemCategoryCode`;
+              const itemRes = await fetch(itemUrl, {
+                method: "GET",
+                credentials: "include",
+                headers: { "Accept": "application/json" }
+              });
+              if (itemRes.ok) {
+                const itemData = await itemRes.json();
+                (itemData.value || []).forEach(it => {
+                  if (it && it.number) {
+                    itemInfo[String(it.number).toUpperCase()] = {
+                      itemDiscGroup: it.itemDiscGroup,
+                      itemCategoryCode: it.itemCategoryCode
+                    };
+                  }
+                });
+              }
+            }
+            lines.forEach(r => {
+              const info = itemInfo[String(r.number || "").toUpperCase()];
+              if (info) {
+                r.itemDiscGroup = info.itemDiscGroup || "";
+                r.itemCategoryCode = r.itemCategoryCode || info.itemCategoryCode || "";
+              }
+            });
+          } catch (e) {
+            // Ignorēt AustraItem papildināšanas kļūdas
+          }
+
+          sendResponse({ success: true, lines });
         } else {
           sendResponse({
             success: false,
