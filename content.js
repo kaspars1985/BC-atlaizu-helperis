@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.7";
+  const APP_VERSION = "3.0.0";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -1616,6 +1616,7 @@
   function parseLvDate(str) {
     if (!str) return null;
     const s = String(str).trim();
+    if (!s || s.startsWith("0001-")) return null;
 
     // ISO: YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD
     let m = s.match(/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})$/);
@@ -1836,8 +1837,40 @@
         }
       } catch (e) {}
 
-      // 1. Vispirms nolasām klienta noteikumus, lai zinātu grupu kodus
-      const { rules: clientRules, isSynced } = await getClientRulesData(headerInfo.relatedCustomerNo);
+      const bcDocForEnv = getBCDocument();
+      const hrefSource = (bcDocForEnv && bcDocForEnv.location && bcDocForEnv.location.href) || window.location.href || '';
+      let company = '';
+      try {
+        company = new URL(hrefSource).searchParams.get('company') || '';
+      } catch (_) {
+        company = '';
+      }
+
+      const syncCustomerDiscountsDirect = async (custNo) => {
+        const send = () => chrome.runtime.sendMessage({
+          action: "FETCH_CUSTOMER_DISCOUNTS_WS",
+          customerNo: custNo,
+          company
+        }).catch(e => ({ success: false, error: String(e) }));
+
+        let resp = await send();
+        if (resp && (resp.authRequired || resp.status === 401 || resp.status === 403)) {
+          const creds = await promptODataCredentials();
+          if (creds) {
+            resp = await send();
+          }
+        }
+        return resp;
+      };
+
+      // 1. Vispirms nolasām klienta noteikumus (ja nav kešā, automātiski paņemam no BC Web Services!)
+      let { rules: clientRules, isSynced } = await getClientRulesData(headerInfo.relatedCustomerNo);
+      if (headerInfo.relatedCustomerNo && !isSynced) {
+        const autoWs = await syncCustomerDiscountsDirect(headerInfo.relatedCustomerNo);
+        if (autoWs && autoWs.success) {
+          ({ rules: clientRules, isSynced } = await getClientRulesData(headerInfo.relatedCustomerNo));
+        }
+      }
       const knownGroupCodes = new Set((clientRules || []).filter(r => /grup|disc|atlai/i.test(r.type || '') && r.code).map(r => String(r.code).trim().toUpperCase()));
 
       // 2. ZIBENĪGI nolasām uzreiz redzamās rindas, lai modālis atvērtos uzreiz (<10ms)
@@ -1845,14 +1878,6 @@
 
       if (headerInfo.orderNo) {
         try {
-          const bcDoc = getBCDocument();
-          const hrefSource = (bcDoc && bcDoc.location && bcDoc.location.href) || window.location.href || '';
-          let company = '';
-          try {
-            company = new URL(hrefSource).searchParams.get('company') || '';
-          } catch (_) {
-            company = '';
-          }
 
           let odataRes = await chrome.runtime.sendMessage({
             action: "ODATA_GET_ORDER_LINES",
@@ -2061,7 +2086,7 @@
 
             <div>
               <button class="bcm-btn ${isSynced ? 'bcm-btn-secondary' : 'bcm-btn-primary'}" id="bcm-refresh-discounts-btn" style="padding: 6px 14px; font-size: 12.5px; margin: 0; width: auto;" title="Atvērt Page 7004, nofiltrēt un ielasīt klienta atlaides">
-                🔄 ${isSynced ? 'Atjaunot no Page 7004' : 'Ielasīt atlaides no Page 7004'}
+                🔄 ${isSynced ? 'Atjaunot klienta atlaides' : 'Ielasīt klienta atlaides'}
               </button>
             </div>
           </div>
@@ -2326,15 +2351,39 @@
           return;
         }
         const refreshBtn = modal.querySelector("#bcm-refresh-discounts-btn");
+        const origHtml = refreshBtn ? refreshBtn.innerHTML : "";
         if (refreshBtn) {
           refreshBtn.disabled = true;
           refreshBtn.style.opacity = "0.7";
           refreshBtn.innerHTML = `⏳ Ielasa atlaides...`;
         }
+
+        const wsRes = await syncCustomerDiscountsDirect(targetCust);
+        if (wsRes && wsRes.success) {
+          if (wsRes.count > 0) {
+            showToast(`✓ Klienta ${targetCust} atlaides (${wsRes.count} noteikumi) ielasītas!`, "success");
+          } else {
+            showToast(`ℹ️ Klientam ${targetCust} Business Central nav konfigurētu atlaižu (0 noteikumi).`, "info");
+          }
+          openDiscountManagerModal(targetCust);
+          return;
+        }
+
+        if (wsRes && (wsRes.authRequired || wsRes.status === 401 || wsRes.status === 403)) {
+          if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.style.opacity = "1";
+            refreshBtn.innerHTML = origHtml;
+          }
+          return;
+        }
+
+        // Rezerves variants (Fallback): Page 7004 fona cilne
         showToast(`⚡ Fona sinhronizācija: nolasa klienta ${targetCust} atlaides no BC...`, "info");
         chrome.runtime.sendMessage({
           action: "START_CUSTOMER_SYNC",
-          customerNo: targetCust
+          customerNo: targetCust,
+          company
         });
       });
 

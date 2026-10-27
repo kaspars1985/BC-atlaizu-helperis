@@ -211,6 +211,135 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  // Web Services (SOAP :7047): Klienta atlaižu tiešā nolasīšana bez Page 7004 cilnes
+  if (request.action === "FETCH_CUSTOMER_DISCOUNTS_WS") {
+    (async () => {
+      try {
+        const env = await resolveBcEnv(sender.tab?.url, request.company);
+        const customerNo = String(request.customerNo || "").trim().toUpperCase();
+        if (!customerNo) {
+          sendResponse({ success: false, error: "NO_CUSTOMER" });
+          return;
+        }
+
+        const soapUrl = `https://${env.hostname}:7047/${env.instance}/WS/${encodeURIComponent(env.company)}/Page/workflowSalesLineDiscounts`;
+        const escXml = (s) => String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+
+        const soapBody =
+          '<?xml version="1.0" encoding="utf-8"?>' +
+          '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">' +
+            '<soap:Body>' +
+              '<ReadMultiple xmlns="urn:microsoft-dynamics-schemas/page/workflowsaleslinediscounts">' +
+                '<filter><Field>Sales_Type</Field><Criteria>Customer</Criteria></filter>' +
+                '<filter><Field>Sales_Code</Field><Criteria>' + escXml(customerNo) + '</Criteria></filter>' +
+                '<filter><Field>Type</Field><Criteria>0|1</Criteria></filter>' +
+                '<setSize>5000</setSize>' +
+              '</ReadMultiple>' +
+            '</soap:Body>' +
+          '</soap:Envelope>';
+
+        const res = await fetch(soapUrl, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "text/xml; charset=utf-8",
+            "SOAPAction": "urn:microsoft-dynamics-schemas/page/workflowsaleslinediscounts:ReadMultiple"
+          },
+          body: soapBody
+        });
+
+        if (!res.ok) {
+          let errText = "";
+          try { errText = await res.text(); } catch (_) {}
+          sendResponse({
+            success: false,
+            status: res.status,
+            authRequired: res.status === 401 || res.status === 403,
+            error: errText || `HTTP ${res.status}`
+          });
+          return;
+        }
+
+        const xml = await res.text();
+        const decodeXml = (s) => String(s == null ? "" : s)
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'")
+          .replace(/&amp;/g, "&");
+
+        const items = [];
+        const itemRe = /<workflowSalesLineDiscounts>([\s\S]*?)<\/workflowSalesLineDiscounts>/g;
+        let m;
+        while ((m = itemRe.exec(xml)) !== null) {
+          const block = m[1];
+          const getTag = (tag) => {
+            const re = new RegExp("<" + tag + ">([\\s\\S]*?)</" + tag + ">");
+            const mm = block.match(re);
+            return mm ? decodeXml(mm[1]) : "";
+          };
+          items.push({
+            Sales_Type: getTag("Sales_Type"),
+            Sales_Code: getTag("Sales_Code"),
+            Type: getTag("Type"),
+            Code: getTag("Code"),
+            Unit_of_Measure_Code: getTag("Unit_of_Measure_Code"),
+            Minimum_Quantity: getTag("Minimum_Quantity"),
+            Line_Discount_Percent: getTag("Line_Discount_Percent"),
+            Starting_Date: getTag("Starting_Date"),
+            Ending_Date: getTag("Ending_Date")
+          });
+        }
+
+        const rules = [];
+        for (const it of items) {
+          if (String(it.Sales_Code).trim().toUpperCase() !== customerNo) continue;
+          const pct = parseFloat(it.Line_Discount_Percent);
+          if (!(pct > 0)) continue;
+          const typeStr = String(it.Type || "");
+          rules.push({
+            salesType: "Klients",
+            salesCode: customerNo,
+            type: (typeStr === "Item_Disc_Group" || /grup|group/i.test(typeStr))
+              ? "Preces atlaides grupa"
+              : "Prece",
+            code: it.Code,
+            uom: it.Unit_of_Measure_Code || "",
+            minQty: parseFloat(it.Minimum_Quantity) || 0,
+            discountPercent: pct || 0,
+            startDate: (!it.Starting_Date || it.Starting_Date.startsWith("0001-")) ? "" : it.Starting_Date,
+            endDate: (!it.Ending_Date || it.Ending_Date.startsWith("0001-")) ? "" : it.Ending_Date
+          });
+        }
+
+        const stored = await chrome.storage.local.get(["bc_client_discounts", "bc_client_discounts_meta"]);
+        const discounts = stored.bc_client_discounts || {};
+        const meta = stored.bc_client_discounts_meta || {};
+        discounts[customerNo] = rules;
+        meta[customerNo] = {
+          syncedAt: Date.now(),
+          count: rules.length,
+          rowCount: items.length,
+          source: "ws"
+        };
+        await chrome.storage.local.set({
+          bc_client_discounts: discounts,
+          bc_client_discounts_meta: meta
+        });
+
+        sendResponse({ success: true, count: rules.length, rowCount: items.length, rules });
+      } catch (err) {
+        sendResponse({ success: false, error: String(err && err.message ? err.message : err) });
+      }
+    })();
+    return true;
+  }
+
   // ODataV4: Pasūtījuma rindu nolasīšana
   if (request.action === "ODATA_GET_ORDER_LINES") {
     (async () => {
@@ -509,7 +638,7 @@ const triedODataAuthReqs = new Set();
 if (chrome.webRequest && chrome.webRequest.onAuthRequired) {
   chrome.webRequest.onAuthRequired.addListener(
     (details, callback) => {
-      if (!details.url || !details.url.includes(":7048/")) {
+      if (!details.url || (!details.url.includes(":7048/") && !details.url.includes(":7047/"))) {
         callback({});
         return;
       }
