@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "2.2.6";
+  const APP_VERSION = "2.2.7";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -2325,7 +2325,13 @@
           showToast("Lūdzu, ievadiet saistītā klienta kodu!", "warning");
           return;
         }
-        showToast(`⚡ Atver Page 7004 klienta ${targetCust} atlaižu nolasīšanai...`, "info");
+        const refreshBtn = modal.querySelector("#bcm-refresh-discounts-btn");
+        if (refreshBtn) {
+          refreshBtn.disabled = true;
+          refreshBtn.style.opacity = "0.7";
+          refreshBtn.innerHTML = `⏳ Ielasa atlaides...`;
+        }
+        showToast(`⚡ Fona sinhronizācija: nolasa klienta ${targetCust} atlaides no BC...`, "info");
         chrome.runtime.sendMessage({
           action: "START_CUSTOMER_SYNC",
           customerNo: targetCust
@@ -3057,14 +3063,14 @@
       const table = doc && doc.querySelector("table.ms-nav-grid-data-table");
       if (f === target && table) {
         if (!stableSince) stableSince = Date.now();
-        if (Date.now() - stableSince > 1200) {
+        if (Date.now() - stableSince > 350) {
           bcmLog("WAIT_FOR_FILTERED_PAGE_SUCCESS", { target, elapsedMs: Date.now() - t0 });
           return { ok: true, doc, table };
         }
       } else {
         stableSince = 0;
       }
-      await delay(300);
+      await delay(150);
     }
 
     const doc = getBCAppDocument();
@@ -3164,19 +3170,30 @@
 
     // 1. Nolasām augšā
     scroller.scrollTop = 0;
-    await delay(700);
+    await delay(250);
     collect();
     onProgress && onProgress(byIndex.size, expectedRowCount(doc));
 
+    // Zero-scroll pārbaude: ja visas gaidītās rindas jau ir ielādētas pirmajā ekrānā, neritinām vispār!
+    const initialExpected = expectedRowCount(doc);
+    if (initialExpected > 0 && byIndex.size >= initialExpected) {
+      scroller.scrollTop = 0;
+      bcmLog("SCRAPE_COMPLETED_ZERO_SCROLL", { collected: byIndex.size, finalExpected: initialExpected });
+      return {
+        rows: Array.from(byIndex.values()),
+        expected: initialExpected
+      };
+    }
+
     // 2. Ritinām pakāpeniski uz leju līdz beigām
     const clientH = scroller.clientHeight || 800;
-    const step = Math.max(350, Math.floor(clientH * 0.7));
+    const step = Math.max(350, Math.floor(clientH * 0.85));
     let stagnant = 0;
 
     for (let pos = step; pos <= scroller.scrollHeight + clientH; pos += step) {
       const before = byIndex.size;
       scroller.scrollTop = pos;
-      await delay(600); // Ļaujam BC serverim un DOM asinhroni ielādēt virtuālās rindas
+      await delay(120); // Zibenīga 120ms pauze DOM virtuālajām rindām
       collect();
 
       const exp = expectedRowCount(doc);
@@ -3189,9 +3206,12 @@
     }
 
     // 3. Pārliecināmies arī pašā apakšā
-    scroller.scrollTop = scroller.scrollHeight;
-    await delay(700);
-    collect();
+    const preBottomExpected = expectedRowCount(doc);
+    if (!(preBottomExpected > 0 && byIndex.size >= preBottomExpected)) {
+      scroller.scrollTop = scroller.scrollHeight;
+      await delay(200);
+      collect();
+    }
 
     // Atgriežam ritjoslu uz augšu
     scroller.scrollTop = 0;
@@ -3299,6 +3319,7 @@
     if (expected === 0 || rows.length === 0) {
       // Īsts "0 atlaižu" gadījums ir pieļaujams TIKAI tad, ja filtrs ir apstiprināts (waitForFilteredPage ok) un režģis ir tukšs
       await saveRules(target, [], 0);
+      chrome.runtime.sendMessage({ action: "FINISH_CUSTOMER_SYNC", customerNo: target, count: 0 });
       return setupAutoCloseCountdown(target, 0, 1, document.getElementById("bcm-page7004-status-text"), document.getElementById("bcm-page7004-actions"));
     }
 
@@ -3308,6 +3329,7 @@
     }
 
     await saveRules(target, v.rules, rows.length);
+    chrome.runtime.sendMessage({ action: "FINISH_CUSTOMER_SYNC", customerNo: target, count: v.rules.length });
     setupAutoCloseCountdown(target, v.rules.length, 1, document.getElementById("bcm-page7004-status-text"), document.getElementById("bcm-page7004-actions"));
   }
 

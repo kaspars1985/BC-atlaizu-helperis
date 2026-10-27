@@ -89,7 +89,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const filterEncoded = encodeURIComponent(`'Sales Code' IS '${customerNo}'`);
       const targetUrl = `${env.protocol}//${env.hostname}:${env.port}/${env.instance}/?company=${encodeURIComponent(env.company)}&page=7004&filter=${filterEncoded}`;
 
-      chrome.tabs.create({ url: targetUrl, active: true }, async (newTab) => {
+      chrome.tabs.create({ url: targetUrl, active: false }, async (newTab) => {
         try {
           await chrome.storage.session.set({
             bcm_sync_session: {
