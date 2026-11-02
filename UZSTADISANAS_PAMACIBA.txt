@@ -12,18 +12,26 @@ pasūtījuma rindām caur OData servisu.
 ------------------------------------------------------------------------
 UZSTĀDĪŠANA MICROSOFT EDGE PĀRLŪKĀ:
 ------------------------------------------------------------------------
-1. Adreses joslā ieraksti:
+1. Izpako paplašinājuma .zip mapē:
+   %LOCALAPPDATA%\BC-atlaizu-helperis
+   (ielīmē šo ceļu Explorer adreses joslā un nospied Enter)
+
+2. Adreses joslā ieraksti:
    edge://extensions
    un nospied Enter.
 
-2. Kreisajā sānjoslā ieslēdz slēdzi "Developer mode" (Izstrādātāja režīms).
+3. Kreisajā sānjoslā ieslēdz slēdzi "Developer mode" (Izstrādātāja režīms).
 
-3. Augšpusē nospied pogu "Load unpacked" (Ielādēt neiepakotu).
-
-4. Izvēlies šo mapi (vai atpakoto zip arhīvu).
+4. Augšpusē nospied pogu "Load unpacked" (Ielādēt neiepakotu) un izvēlies
+   mapi BC-atlaizu-helperis.
 
 5. Edge rīkjoslā pie puzles ikonas piespraud acs ikonu pie
    "BC atlaižu pārvaldnieks", lai ikona būtu redzama pārlūka joslā.
+
+6. Ieslēdz automātisko atjaunināšanu (vienreiz): mapē
+   BC-atlaizu-helperis\atjauninasana palaid
+   Ieslegt-AutoAtjauninasanu.cmd
+   (parādīsies melns logs ar apstiprinājumu - tas ir normāli)
 
 ------------------------------------------------------------------------
 UZSTĀDĪŠANA GOOGLE CHROME PĀRLŪKĀ:
@@ -31,6 +39,23 @@ UZSTĀDĪŠANA GOOGLE CHROME PĀRLŪKĀ:
 1. Adreses joslā ieraksti: chrome://extensions
 2. Ieslēdz "Developer mode" (augšā pa labi).
 3. Nospied "Load unpacked" un izvēlies paplašinājuma mapi.
+4. Tāpat kā 6. punktā augstāk - palaid Ieslegt-AutoAtjauninasanu.cmd.
+
+------------------------------------------------------------------------
+ATJAUNINĀŠANA (pēc tam nekas nav jādara):
+------------------------------------------------------------------------
+Ja iznākusi jauna versija, paplašinājums to pamana pats:
+  - rīkjoslas ikonai parādās zīme "↻";
+  - atlaižu logā (Alt+D) parādās zaļš paziņojums
+    "Jaunā versija ... jau ielādēta diskā";
+  - nospied pogu "↻ Pārlādēt tagad" - lapa un paplašinājums pārlādēsies.
+
+Pasūtījums paliek serverī, nekādi ievadītie dati netiek pazaudēti.
+
+Ja gribi pārbaudīt uzreiz, nevis gaidīt Windows pieslēgšanos:
+  atjauninasana\Atjauninat-tagad.cmd
+Ja gribi izslēgt automātisko pārbaudi:
+  atjauninasana\Atcelt-AutoAtjauninasanu.cmd
 
 ------------------------------------------------------------------------
 KĀ LIETOT IKDIENĀ:

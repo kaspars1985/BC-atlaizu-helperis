@@ -22,6 +22,9 @@ chrome.runtime.onInstalled.addListener(() => {
       chrome.storage.local.set({ bc_client_discounts: {} });
     }
   });
+
+  // Pēc pārlādes pārbaudām, vai diska versija sakrīt ar darbojošos
+  checkAppliedUpdate(true);
 });
 
 function parseBcEnvFromUrl(url) {
@@ -512,6 +515,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  // Vai diskā jau ir ielādēta jaunāka versija (skat. atjauninasana/update.ps1)
+  if (request.action === "CHECK_APPLIED_UPDATE") {
+    checkAppliedUpdate(true).then(pending => {
+      sendResponse({ success: true, pending: pending });
+    }).catch(err => {
+      sendResponse({ success: false, error: String(err) });
+    });
+    return true;
+  }
+
+  // Pielietot diskā ielādēto atjauninājumu: pārlādē BC cilnes un paplašinājumu
+  if (request.action === "APPLY_PENDING_UPDATE") {
+    applyPendingUpdate(request.reloadTabs !== false).then(result => {
+      sendResponse(result);
+    }).catch(err => {
+      sendResponse({ success: false, error: String(err) });
+    });
+    return true;
+  }
+
   // Versijas pārbaude (gan manuāla, gan automātiska)
   if (request.action === "CHECK_FOR_UPDATES") {
     checkVersionUpdate(!!request.force).then(info => {
@@ -554,10 +577,7 @@ async function checkVersionUpdate(force = false) {
     const now = Date.now();
 
     if (!force && stored.bcm_update_info && (now - (stored.bcm_update_info.lastChecked || 0) < UPDATE_CHECK_INTERVAL_MS)) {
-      if (stored.bcm_update_info.hasUpdate) {
-        chrome.action.setBadgeText({ text: "NEW" });
-        chrome.action.setBadgeBackgroundColor({ color: "#ff5501" });
-      }
+      refreshActionBadge();
       return stored.bcm_update_info;
     }
 
@@ -590,12 +610,7 @@ async function checkVersionUpdate(force = false) {
 
     await chrome.storage.local.set({ bcm_update_info: updateInfo });
 
-    if (hasUpdate) {
-      chrome.action.setBadgeText({ text: "NEW" });
-      chrome.action.setBadgeBackgroundColor({ color: "#ff5501" });
-    } else {
-      chrome.action.setBadgeText({ text: "" });
-    }
+    refreshActionBadge();
 
     return updateInfo;
   } catch (e) {
@@ -605,10 +620,116 @@ async function checkVersionUpdate(force = false) {
   }
 }
 
+// --------------------------------------------------------------------------
+// Lokāli ielādēta atjauninājuma noteikšana un pielietošana
+// (atjauninasana/update.ps1 aizvieto failus uz diska; pārlūks tos neredz,
+//  kamēr paplašinājums netiek pārlādēts - tāpēc lasām savu manifest.json)
+// --------------------------------------------------------------------------
+const DISK_VERSION_CHECK_INTERVAL_MS = 60 * 1000;
+let diskVersionCheckedAt = 0;
+
+async function readDiskManifestVersion() {
+  const base = chrome.runtime.getURL("manifest.json");
+  const candidates = [base + "?ts=" + Date.now(), base];
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) continue;
+      // res.json() nokrīt, ja failā ir UTF-8 BOM - tāpēc lasām kā tekstu
+      const raw = await res.text();
+      const parsed = JSON.parse(raw.replace(/^\uFEFF/, "").trim());
+      if (parsed && parsed.version) return String(parsed.version);
+    } catch (e) {
+      // mēģinām nākamo variantu
+    }
+  }
+  return null;
+}
+
+async function checkAppliedUpdate(force = false) {
+  const now = Date.now();
+  if (!force && now - diskVersionCheckedAt < DISK_VERSION_CHECK_INTERVAL_MS) return null;
+  diskVersionCheckedAt = now;
+
+  try {
+    const runningVersion = chrome.runtime.getManifest().version;
+    const diskVersion = await readDiskManifestVersion();
+    if (!diskVersion) return null;
+
+    if (isNewerVersion(diskVersion, runningVersion)) {
+      const pending = { diskVersion, runningVersion, detectedAt: now };
+      await chrome.storage.local.set({ bcm_pending_update: pending });
+      await refreshActionBadge();
+      return pending;
+    }
+
+    const stored = await chrome.storage.local.get(["bcm_pending_update"]);
+    if (stored.bcm_pending_update) {
+      await chrome.storage.local.remove("bcm_pending_update");
+      await refreshActionBadge();
+    }
+    return null;
+  } catch (e) {
+    console.warn("[BC atlaižu pārvaldnieks] Neizdevās pārbaudīt diska versiju:", e);
+    return null;
+  }
+}
+
+function isBcTabUrl(url) {
+  const u = String(url || "");
+  if (!/^https?:/i.test(u)) return false;
+  return u.includes(":8443") || u.includes(":7048") || u.includes(":7047") || u.includes("page=") || /businesscentral/i.test(u);
+}
+
+async function applyPendingUpdate(reloadBcTabs = true) {
+  const tabsToReload = [];
+  if (reloadBcTabs) {
+    try {
+      const tabs = await chrome.tabs.query({});
+      (tabs || []).forEach(t => {
+        if (t && t.id != null && isBcTabUrl(t.url)) tabsToReload.push(t.id);
+      });
+    } catch (e) {}
+  }
+
+  await chrome.storage.local.remove("bcm_pending_update").catch(() => {});
+
+  // Vispirms pārlādējam BC cilnes (tās saņems jauno content.js), tad paplašinājumu
+  for (const tabId of tabsToReload) {
+    try { chrome.tabs.reload(tabId); } catch (e) {}
+  }
+  setTimeout(() => {
+    try { chrome.runtime.reload(); } catch (e) {}
+  }, 800);
+
+  return { success: true, reloadedTabs: tabsToReload.length };
+}
+
+async function refreshActionBadge() {
+  try {
+    const stored = await chrome.storage.local.get(["bcm_pending_update", "bcm_update_info"]);
+    if (stored.bcm_pending_update && stored.bcm_pending_update.diskVersion) {
+      chrome.action.setBadgeBackgroundColor({ color: "#16a34a" });
+      chrome.action.setBadgeText({ text: "↻" });
+      return;
+    }
+    if (stored.bcm_update_info && stored.bcm_update_info.hasUpdate) {
+      chrome.action.setBadgeBackgroundColor({ color: "#ff5501" });
+      chrome.action.setBadgeText({ text: "NEW" });
+      return;
+    }
+    chrome.action.setBadgeText({ text: "" });
+  } catch (e) {}
+}
+
 // Automātiskā pārbaude pie pārlūka palaišanas
 chrome.runtime.onStartup.addListener(() => {
   checkVersionUpdate(false);
+  checkAppliedUpdate(true);
 });
+
+// Service worker startā (ikreiz, kad pamostas) pārbaudām diska versiju
+checkAppliedUpdate(false);
 
 // Atver modālo logu aktīvajā cilnē uzklikšķinot uz rīkjoslas ikonas vai nospiežot Alt+D
 function triggerOpenModal(tab) {
@@ -618,6 +739,7 @@ function triggerOpenModal(tab) {
     });
     // Pārbaudām atjauninājumus fonā pie katras modāļa atvēršanas
     checkVersionUpdate(false);
+    checkAppliedUpdate(false);
   }
 }
 

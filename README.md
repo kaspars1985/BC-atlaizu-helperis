@@ -3,7 +3,7 @@
 <p align="center">
   <img src="icons/icon128.png" width="96" height="96" alt="BC atlaižu pārvaldnieks Logo" /><br>
   <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest"><img src="https://img.shields.io/github/v/release/kaspars1985/BC-atlaizu-helperis?label=Laidiens&color=ff5501" alt="Latest Release"></a>
-  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/download/v3.0.0/BC-atlaizu-helperis.zip"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
+  <a href="https://github.com/kaspars1985/BC-atlaizu-helperis/releases/latest"><img src="https://img.shields.io/badge/Lejupielādēt-.zip-blue?style=flat&logo=github" alt="Download ZIP"></a>
 </p>
 
 Pārlūka paplašinājums darbam ar Microsoft Dynamics 365 Business Central.
@@ -20,6 +20,10 @@ Lai katrai rindai nebūtu manuāli jāmeklē meistara līguma atlaides un ar rok
 
 ## Uzstādīšana
 
+> **Ieteicamā vieta:** izpako paplašinājumu stabilā mapē, piemēram
+> `%LOCALAPPDATA%\BC-atlaizu-helperis` (ielīmē šo ceļu Explorer adreses joslā).
+> Tad turpmākie atjauninājumi notiek automātiski un nesaplīst ar citām mapēm.
+
 ### Microsoft Edge:
 1. Adreses joslā atver: `edge://extensions`
 2. Kreisajā pusē ieslēdz "Developer mode" (Izstrādātāja režīms).
@@ -31,6 +35,37 @@ Lai katrai rindai nebūtu manuāli jāmeklē meistara līguma atlaides un ar rok
 1. Adreses joslā atver: `chrome://extensions`
 2. Augšējā labajā stūrī ieslēdz "Developer mode".
 3. Nospied "Load unpacked" un norādi paplašinājuma mapi.
+
+---
+
+## Atjaunināšana (bez ZIP lejupielādes)
+
+Paplašinājums ir uzstādīts kā "unpacked", tāpēc pārlūks pats to nelejupielādē —
+atjauninājumu piegādā mazais skripts mapē `atjauninasana/`.
+
+**Kā tas strādā:**
+1. `atjauninasana/update.ps1` paņem jaunāko GitHub laidienu un izpako to virsū
+   paplašinājuma mapei (vecie faili tiek aizvietoti, novecojušie izņemti).
+2. Paplašinājums pats pamana, ka diskā ir jaunāka versija (`manifest.json` versija
+   lielāka par darbojošos), un atlaižu logā parāda zaļu baneri ar pogu
+   **"↻ Pārlādēt tagad"**. Uz rīkjoslas ikonas parādās `↻` zīme.
+3. Poga pārlādē Business Central cilni un paplašinājumu. Pasūtījums paliek serverī,
+   dati netiek pazaudēti.
+
+**Pirmā uzstādīšana (vienreiz):**
+1. Izpako jaunāko `.zip` mapē `%LOCALAPPDATA%\BC-atlaizu-helperis`.
+2. `edge://extensions` → Developer mode → Load unpacked → izvēlies šo mapi.
+3. Atver mapi `atjauninasana` un palaid **`Ieslegt-AutoAtjauninasanu.cmd`** —
+   tā reģistrē pārbaudi katrā Windows pieslēgšanās reizē (HKCU `Run` atslēga,
+   admin tiesības nav vajadzīgas).
+
+**Ikdienā:** nekas nav jādara. Ja gribi pārbaudīt uzreiz — palaid
+`atjauninasana\Atjauninat-tagad.cmd`. Izslēgt — `Atcelt-AutoAtjauninasanu.cmd`.
+Žurnāls: `atjauninasana\update.log`.
+
+**Izlaides sagatavošana (izstrādātājam):** veidojot jaunu laidienu, iekļauj `.zip`
+arī mapi `atjauninasana/` un pirms tam `manifest.json` un `content.js`
+(`APP_VERSION`) paceļ versiju. Pretējā gadījumā kolēģiem pazudīs atjauninātājs.
 
 ---
 

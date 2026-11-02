@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "3.0.0";
+  const APP_VERSION = "3.1.0";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -1962,9 +1962,11 @@
       lines.hasDiscountColumn = rawLines.hasDiscountColumn;
       lines.hasGroupColumn = rawLines.hasGroupColumn;
       let updateInfo = null;
+      let pendingUpdate = null;
       try {
-        const stored = await chrome.storage.local.get(["bcm_update_info"]);
+        const stored = await chrome.storage.local.get(["bcm_update_info", "bcm_pending_update"]);
         updateInfo = stored.bcm_update_info;
+        pendingUpdate = stored.bcm_pending_update || null;
       } catch (e) {}
 
       const renderTableRows = (currentLines) => {
@@ -2036,8 +2038,21 @@
             <button class="bcm-close-btn" id="bcm-modal-close" title="Aizvērt logu">✕</button>
           </div>
 
+          <!-- Diska atjauninājuma baneris (atjauninasana/update.ps1 jau ierakstīja failus) -->
+          <div id="bcm-applied-update-banner" style="${pendingUpdate ? 'display: flex;' : 'display: none;'} align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 20px 10px 20px; padding: 10px 14px; background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #065f46;">
+              <span style="font-size: 18px;">♻️</span>
+              <span id="bcm-applied-update-text">
+                <strong>Jaunā versija v${escapeHtml((pendingUpdate && pendingUpdate.diskVersion) || '')} jau ielādēta diskā.</strong> (Darbojas v${APP_VERSION})
+              </span>
+            </div>
+            <button class="bcm-btn bcm-btn-primary" id="bcm-apply-update-btn" style="padding: 4px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; background: #059669; width: auto; margin: 0;" title="Pārlādēt Business Central lapu un paplašinājumu (pasūtījums paliek serverī, dati netiek pazaudēti)">
+              ↻ Pārlādēt tagad
+            </button>
+          </div>
+
           <!-- Atjauninājuma paziņojuma baneris -->
-          <div id="bcm-update-banner-box" style="${updateInfo && updateInfo.hasUpdate ? 'display: block;' : 'display: none;'} margin: 0 20px 10px 20px; padding: 10px 14px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px;">
+          <div id="bcm-update-banner-box" style="${updateInfo && updateInfo.hasUpdate && !pendingUpdate ? 'display: block;' : 'display: none;'} margin: 0 20px 10px 20px; padding: 10px 14px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #9a3412;">
                 <span style="font-size: 18px;">🚀</span>
@@ -2203,6 +2218,43 @@
 
       modal.querySelector("#bcm-modal-close").addEventListener("click", closeModal);
       modal.querySelector("#bcm-cancel-btn").addEventListener("click", closeModal);
+
+      // Diska atjauninājuma pielietošana (pēc atjauninasana/update.ps1)
+      const showAppliedUpdateBanner = (pending) => {
+        if (!pending || !activeModal) return;
+        const box = activeModal.querySelector("#bcm-applied-update-banner");
+        const txt = activeModal.querySelector("#bcm-applied-update-text");
+        const zipBox = activeModal.querySelector("#bcm-update-banner-box");
+        if (box) box.style.display = "flex";
+        if (zipBox) zipBox.style.display = "none";
+        if (txt) txt.innerHTML = `<strong>Jaunā versija v${escapeHtml(pending.diskVersion)} jau ielādēta diskā.</strong> (Darbojas v${APP_VERSION})`;
+      };
+
+      const applyUpdateBtn = modal.querySelector("#bcm-apply-update-btn");
+      if (applyUpdateBtn) {
+        applyUpdateBtn.addEventListener("click", () => {
+          const ok = typeof window.confirm === "function"
+            ? window.confirm("Pārlādīt Business Central lapu un paplašinājumu uz jauno versiju?\n\nPasūtījums paliek serverī — nekādi ievadītie dati netiks pazaudēti.")
+            : true;
+          if (!ok) return;
+          applyUpdateBtn.disabled = true;
+          applyUpdateBtn.textContent = "Pārlādē...";
+          showToast("Paplašinājums tiek atjaunināts — lapa drīz pārlādēsies.", "info");
+          try {
+            chrome.runtime.sendMessage({ action: "APPLY_PENDING_UPDATE" }, () => {
+              void chrome.runtime.lastError;
+            });
+          } catch (e) {}
+        });
+      }
+
+      // Ja pārbaude atklāj diska atjauninājumu tikai tagad — parādām baneri uzreiz
+      try {
+        chrome.runtime.sendMessage({ action: "CHECK_APPLIED_UPDATE" }, (res) => {
+          if (chrome.runtime.lastError) return;
+          if (res && res.pending) showAppliedUpdateBanner(res.pending);
+        });
+      } catch (e) {}
 
       // Saistītā klienta maiņa
       const applyClientBtn = modal.querySelector("#bcm-apply-client-btn");
