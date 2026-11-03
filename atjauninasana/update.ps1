@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     BC atlaizu parvaldnieks - lokalais atjauninatajs (Load unpacked rezimam).
 
@@ -165,7 +165,7 @@ function Remove-StaleFiles {
     param([string]$Source, [string]$Destination)
     Get-ChildItem -LiteralPath $Destination -Recurse -File | ForEach-Object {
         $relative = $_.FullName.Substring($Destination.Length).TrimStart('\', '/')
-        if ($relative -like "atjauninasana*") { return }
+        if ($relative -like "atjauninasana*" -or $relative -like ".git*") { return }
         if (-not (Test-Path -LiteralPath (Join-Path $Source $relative))) {
             Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
             Write-Log "Iznemts vecais fails: $relative"
@@ -175,7 +175,7 @@ function Remove-StaleFiles {
     for ($pass = 0; $pass -lt 3; $pass++) {
         Get-ChildItem -LiteralPath $Destination -Recurse -Directory | Sort-Object { $_.FullName.Length } -Descending | ForEach-Object {
             $relative = $_.FullName.Substring($Destination.Length).TrimStart('\', '/')
-            if ($relative -like "atjauninasana*") { return }
+            if ($relative -like "atjauninasana*" -or $relative -like ".git*") { return }
             if (-not (Get-ChildItem -LiteralPath $_.FullName -Force)) {
                 Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
                 Write-Log "Iznemta tuksa mape: $relative"
@@ -228,7 +228,7 @@ function Invoke-Update {
 
     Write-Log "--- Atjauninasana sakas (merka mape: $script:TargetPath) ---"
 
-    if ((Test-Path -LiteralPath (Join-Path $script:TargetPath ".git")) -and -not $Force) {
+    if (-not $CheckOnly -and (Test-Path -LiteralPath (Join-Path $script:TargetPath ".git")) -and -not $Force) {
         Write-Log "Merka mape izskatas pec izstrades repozitorija (.git). Lai neiznicinatu avota kodu, atjauninasana aptureta. Ja taa tiešam ir paplasinajuma mape - palaid ar -Force." "ERROR"
         return 1
     }

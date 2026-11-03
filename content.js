@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "3.1.0";
+  const APP_VERSION = "3.1.1";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
