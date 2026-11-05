@@ -19,7 +19,7 @@
   // --------------------------------------------------------------------------
   // Konstantas un Stāvoklis (State)
   // --------------------------------------------------------------------------
-  const APP_VERSION = "3.1.1";
+  const APP_VERSION = "3.1.2";
   let activeModal = null;
   let activeToastTimeout = null;
   let autoSyncTriggered = false;
@@ -1205,37 +1205,6 @@
         const gCell = getCellByCol(colAriaIndices.group, colIndices.group);
         if (gCell) groupCode = getVal(gCell);
       }
-      // (c) viedā inferēšana
-      if (!groupCode) {
-        const excludeIdx = new Set();
-        const addIdx = (ariaIdx, fallbackIdx) => {
-          if (fallbackIdx >= 0) excludeIdx.add(fallbackIdx + rowOffset);
-        };
-        addIdx(colAriaIndices.type, colIndices.type);
-        addIdx(colAriaIndices.code, colIndices.code);
-        addIdx(colAriaIndices.desc, colIndices.desc);
-        addIdx(colAriaIndices.qty, colIndices.qty);
-        addIdx(colAriaIndices.uom, colIndices.uom);
-        addIdx(colAriaIndices.discount, colIndices.discount);
-        addIdx(colAriaIndices.price, colIndices.price);
-        addIdx(colAriaIndices.amount, colIndices.amount);
-        for (let i = 0; i < cells.length; i++) {
-          if (excludeIdx.has(i)) continue;
-          const val = getCellVal(i);
-          if (!val) continue;
-          if (val === codeVal) continue;
-          if (isDateString(val)) continue;
-          const upper = val.toUpperCase();
-          if (knownGroups && knownGroups.has(upper)) {
-            groupCode = val;
-            break;
-          }
-          if (/^\d{4}(_\d+)?$/.test(val)) {
-            groupCode = val;
-            break;
-          }
-        }
-      }
 
       // Mērvienības kods
       let lineUom = "";
@@ -1270,6 +1239,8 @@
         itemCode: codeVal,
         description: descVal,
         groupCode: groupCode,
+        itemDiscGroup: groupCode,
+        itemCategoryCode: "",
         uom: lineUom,
         qty: qty,
         rowCellTexts: rowCellTexts,
@@ -1615,7 +1586,7 @@
   // Palīgfunkcija datuma (DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD u.c.) parsēšanai
   function parseLvDate(str) {
     if (!str) return null;
-    const s = String(str).trim();
+    const s = String(str).split("T")[0].trim();
     if (!s || s.startsWith("0001-")) return null;
 
     // ISO: YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD
@@ -1746,18 +1717,6 @@
             candidates.push({
               rule,
               priority: 2.1,
-              reason: `Grupas ${rule.code} atlaide (${rule.discountPercent}%)`
-            });
-            continue;
-          }
-          // Sekundāri: sakrīt ar kādu citu šūnas tekstu šajā rindā
-          else if (line.rowCellTexts && line.rowCellTexts.some(txt => {
-            const u = txt.toUpperCase();
-            return u === ruleCodeUpper || (/^\d{4}_\d+$/.test(u) && u.split('_')[0] === ruleCodeUpper);
-          })) {
-            candidates.push({
-              rule,
-              priority: 2,
               reason: `Grupas ${rule.code} atlaide (${rule.discountPercent}%)`
             });
             continue;
@@ -1915,8 +1874,14 @@
                   domLine.documentNumber = oRow.documentNumber;
                   domLine.description = oRow.description || domLine.description || '';
                   domLine.qty = Number(oRow.quantity) || domLine.qty || 1;
-                  domLine.groupCode = oRow.itemCategoryCode || oRow.itemDiscGroup || domLine.groupCode || '';
-                  domLine.itemDiscGroup = oRow.itemDiscGroup || '';
+                  if (typeof oRow.itemDiscGroup === "string") {
+                    domLine.itemDiscGroup = oRow.itemDiscGroup;
+                    domLine.groupCode = oRow.itemDiscGroup;
+                  } else {
+                    domLine.itemDiscGroup = oRow.itemDiscGroup || domLine.itemDiscGroup || '';
+                    domLine.groupCode = domLine.itemDiscGroup || domLine.groupCode || '';
+                  }
+                  domLine.itemCategoryCode = oRow.itemCategoryCode || domLine.itemCategoryCode || '';
                   domLine.uom = domLine.uom || oRow.unitOfMeasureCode || oRow.unitOfMeasure || "";
                   domLine.currentDiscount = Number(oRow.lineDiscountPercent) || domLine.currentDiscount || 0;
                   odataEnriched.push(domLine);
@@ -1928,8 +1893,9 @@
                     description: oRow.description || "",
                     qty: Number(oRow.quantity) || 1,
                     uom: oRow.unitOfMeasureCode || oRow.unitOfMeasure || "",
-                    groupCode: oRow.itemCategoryCode || oRow.itemDiscGroup || "",
+                    groupCode: oRow.itemDiscGroup || "",
                     itemDiscGroup: oRow.itemDiscGroup || "",
+                    itemCategoryCode: oRow.itemCategoryCode || "",
                     currentDiscount: Number(oRow.lineDiscountPercent) || 0,
                     newDiscount: Number(oRow.lineDiscountPercent) || 0,
                     lineNumber: oRow.lineNumber,

@@ -315,8 +315,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             uom: it.Unit_of_Measure_Code || "",
             minQty: parseFloat(it.Minimum_Quantity) || 0,
             discountPercent: pct || 0,
-            startDate: (!it.Starting_Date || it.Starting_Date.startsWith("0001-")) ? "" : it.Starting_Date,
-            endDate: (!it.Ending_Date || it.Ending_Date.startsWith("0001-")) ? "" : it.Ending_Date
+            startDate: (!it.Starting_Date || it.Starting_Date.startsWith("0001-")) ? "" : String(it.Starting_Date).split("T")[0],
+            endDate: (!it.Ending_Date || it.Ending_Date.startsWith("0001-")) ? "" : String(it.Ending_Date).split("T")[0]
           });
         }
 
