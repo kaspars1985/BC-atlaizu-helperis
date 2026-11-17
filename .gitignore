@@ -12,8 +12,7 @@ Desktop.ini
 # Logs
 *.log
 
-# Pavadzimju audits local config and exports
-pavadzimju-audits/.config.json
-pavadzimju-audits/exports/
+# Pavadzimju audits (local only)
+pavadzimju-audits/
 scratch/task_spec_*.md
 _backups/
