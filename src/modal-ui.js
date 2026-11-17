@@ -93,7 +93,7 @@
       let { rules: clientRules, isSynced } = await getClientRulesData(headerInfo.relatedCustomerNo);
       let knownGroupCodes = new Set((clientRules || []).filter((r) => /grup|disc|atlai/i.test(r.type || "") && r.code).map((r) => String(r.code).trim().toUpperCase()));
       const rawLines = extractSalesLines(knownGroupCodes);
-      let lines = await matchDiscountsForLines(rawLines, headerInfo.relatedCustomerNo);
+      let lines = await matchDiscountsForLines(rawLines.slice(), headerInfo.relatedCustomerNo);
       lines.odataLoaded = false;
       lines.hasDiscountColumn = rawLines.hasDiscountColumn;
       lines.hasGroupColumn = rawLines.hasGroupColumn;
@@ -667,7 +667,7 @@
               }
             }
 
-            const updated = await matchDiscountsForLines(rawLines, headerInfo.relatedCustomerNo);
+            const updated = await matchDiscountsForLines(rawLines.slice(), headerInfo.relatedCustomerNo);
             lines.length = 0;
             updated.forEach((l) => lines.push(l));
             lines.odataLoaded = rawLines.odataLoaded;
