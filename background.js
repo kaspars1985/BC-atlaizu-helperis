@@ -66,8 +66,56 @@ async function resolveBcEnv(senderUrl, reqCompany) {
   return env;
 }
 
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let nextIdx = 0;
+  const workerCount = Math.min(Math.max(1, limit || 4), items.length);
+  const workers = [];
+  for (let w = 0; w < workerCount; w++) {
+    workers.push((async () => {
+      while (nextIdx < items.length) {
+        const idx = nextIdx++;
+        results[idx] = await fn(items[idx], idx);
+      }
+    })());
+  }
+  await Promise.all(workers);
+  return results;
+}
+
+let logWriteQueue = Promise.resolve();
+function appendDebugLog(entry) {
+  logWriteQueue = logWriteQueue.then(async () => {
+    try {
+      const res = await chrome.storage.local.get(["bcm_debug_log"]);
+      const log = Array.isArray(res.bcm_debug_log) ? res.bcm_debug_log : [];
+      log.push(entry);
+      if (log.length > 200) log.splice(0, log.length - 200);
+      await chrome.storage.local.set({ bcm_debug_log: log });
+    } catch (e) {}
+  });
+}
+
 // Message Listener for coordination between content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "BCM_LOG" && request.entry) {
+    appendDebugLog(request.entry);
+    sendResponse({ success: true });
+    return false;
+  }
+
+  if (request.action === "INJECT_STYLES") {
+    if (sender.tab && sender.tab.id != null) {
+      chrome.scripting.insertCSS({
+        target: { tabId: sender.tab.id },
+        files: ["styles.css"]
+      }).then(() => sendResponse({ success: true }))
+        .catch(() => sendResponse({ success: false }));
+      return true;
+    }
+    sendResponse({ success: false });
+    return false;
+  }
   // Get active BC tabs
   if (request.action === "GET_ACTIVE_BC_TABS") {
     chrome.tabs.query({}, (tabs) => {
@@ -225,7 +273,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        const soapUrl = `https://${env.hostname}:7047/${env.instance}/WS/${encodeURIComponent(env.company)}/Page/workflowSalesLineDiscounts`;
+        const soapUrl = `${env.protocol}//${env.hostname}:7047/${env.instance}/WS/${encodeURIComponent(env.company)}/Page/workflowSalesLineDiscounts`;
         const escXml = (s) => String(s)
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
@@ -353,7 +401,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: "NO_ORDER_NO" });
           return;
         }
-        const odataUrl = `https://${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
+        const odataUrl = `${env.protocol}//${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/salesDocumentLines?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
         const res = await fetch(odataUrl, {
           method: "GET",
           credentials: "include",
@@ -371,10 +419,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
           try {
             const itemInfo = {};
+            const itemBatches = [];
             for (let i = 0; i < itemNumbers.length; i += 25) {
-              const batch = itemNumbers.slice(i, i + 25);
+              itemBatches.push(itemNumbers.slice(i, i + 25));
+            }
+            await mapWithConcurrency(itemBatches, 4, async (batch) => {
               const orExpr = batch.map(n => `number eq '${n.replace(/'/g, "''")}'`).join(" or ");
-              const itemUrl = `https://${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/AustraItem?$filter=${encodeURIComponent(orExpr)}&$select=number,itemDiscGroup,itemCategoryCode`;
+              const itemUrl = `${env.protocol}//${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/AustraItem?$filter=${encodeURIComponent(orExpr)}&$select=number,itemDiscGroup,itemCategoryCode`;
               const itemRes = await fetch(itemUrl, {
                 method: "GET",
                 credentials: "include",
@@ -391,7 +442,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                   }
                 });
               }
-            }
+            });
             lines.forEach(r => {
               const info = itemInfo[String(r.number || "").toUpperCase()];
               if (info) {
@@ -431,7 +482,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        const baseUrl = `https://${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/salesDocumentLines`;
+        const baseUrl = `${env.protocol}//${env.hostname}:7048/${env.instance}/ODataV4/Company('${encodeURIComponent(env.company)}')/salesDocumentLines`;
         const getUrl = `${baseUrl}?$filter=${encodeURIComponent("documentNumber eq '" + orderNo + "'")}`;
         const getRes = await fetch(getUrl, {
           method: "GET",
@@ -453,6 +504,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         let updatedCount = 0;
         const failedIds = [];
         const usedLineNumbers = new Set();
+        const patchTasks = [];
 
         for (const u of updates) {
           let targetRow = null;
@@ -479,6 +531,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             continue;
           }
 
+          patchTasks.push({ u, targetRow });
+        }
+
+        await mapWithConcurrency(patchTasks, 4, async ({ u, targetRow }) => {
           const patchUrl = `${baseUrl}(documentType='${encodeURIComponent(targetRow.documentType)}',documentNumber='${encodeURIComponent(targetRow.documentNumber)}',lineNumber=${targetRow.lineNumber})`;
           const patchOptions = {
             method: "PATCH",
@@ -505,7 +561,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           } else {
             failedIds.push(u.id);
           }
-        }
+        });
 
         sendResponse({ success: true, updatedCount, failedIds });
       } catch (err) {

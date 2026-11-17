@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BC atlaižu pārvaldnieks",
-  "version": "3.1.2",
+  "version": "3.2.0",
   "description": "Saistītā klienta rindu atlaižu automātiska nolasīšana un piemērošana Microsoft Dynamics 365 Business Central.",
   "permissions": [
     "storage",
@@ -26,10 +26,13 @@
       ],
       "all_frames": true,
       "js": [
+        "src/utils.js",
+        "src/bc-dom.js",
+        "src/discount-engine.js",
+        "src/odata-apply.js",
+        "src/modal-ui.js",
+        "src/page7004-sync.js",
         "content.js"
-      ],
-      "css": [
-        "styles.css"
       ],
       "run_at": "document_idle"
     }
